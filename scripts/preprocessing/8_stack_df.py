@@ -3,6 +3,7 @@ import glob
 import os
 
 EXP_TYPE = "encoding"
+FILTER_TYPE = "lowpass"  # "lowpass" or "bandpass"
 
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
@@ -30,7 +31,7 @@ def concatenate_csv_files(directories, output_file, runs):
         current_dat = os.path.join(directories, run) if run else directories
 
         #for directory in current_dat:
-        csv_files = glob.glob(os.path.join(current_dat, "*.csv"))
+        csv_files = glob.glob(os.path.join(current_dat, f"*_{FILTER_TYPE}_*.csv"))
         all_files.extend(csv_files)
 
         all_df = []
@@ -39,10 +40,7 @@ def concatenate_csv_files(directories, output_file, runs):
             all_df.append(df)
 
     merged_df = pd.concat(all_df, ignore_index=True)
-    merged_df.to_csv(os.path.join(output_file, "stacked_events.csv"), index=False)
+    merged_df.to_csv(os.path.join(output_file, f"stacked_events_{FILTER_TYPE}.csv"), index=False)
 
-# Example usage:
-#directories = ["run_1", "run_2"]  # Replace with your directory paths
-# output_file = "concatenated_data.csv"
 concatenate_csv_files(DAT_PATH, SAVE_PATH, runs)
 

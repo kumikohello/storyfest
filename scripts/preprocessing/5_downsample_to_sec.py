@@ -25,8 +25,6 @@
 import numpy as np
 import pandas as pd
 import os
-import math
-import importlib
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
@@ -66,7 +64,7 @@ SUBJ_IDS = range(1001,1046)
 APPLY_FILTER = True            # Set to False to skip filtering
 FILTER_TYPE = "lowpass"          # Options: "lowpass", "bandpass"
 LOWCUT_HZ = None                 # Only used if FILTER_TYPE is "bandpass"
-HIGHCUT_HZ = 0.3                # Used in both "lowpass" and "bandpass"
+HIGHCUT_HZ = 0.2                # Used in both "lowpass" and "bandpass"
 FILTER_ORDER = 3
 
 # ------------------ Plot settings ------------------ # 
@@ -123,36 +121,6 @@ def linear_interpolate_epoch(data, idx):
         right = data[idx + 1]
         data[idx] = (left + right) / 2
     return data
-
-def tolerant_mean(arrs):
-    """
-    Calculate the mean of arrays with different lengths
-    
-    Input:
-    - arrs (list of np arrays): contains the epoch samples from each subject
-    
-    Output:
-    - y (np array): mean of the arrays
-    - sem (np array): standard error of the mean of the arrays
-    
-    """
-    
-    # Get the length of each array (i.e., length of each subject's pupil size)
-    lens = [len(i) for i in arrs]
-    
-    # Create a masked array (max_length, number of arrays)
-    arr = np.ma.empty((np.max(lens),len(arrs)))
-    arr.mask = True
-    
-    # Fill the masked array with data
-    # Shorter arrays are left empty
-    for idx, l in enumerate(arrs):
-        arr[:len(l),idx] = l
-    
-    # Calculate standard error
-    sem = arr.std(axis=-1) / np.sqrt(len(arrs))
-    
-    return arr.mean(axis=-1), sem
 
 def lowpass_filter(data, sample_rate, cutoff, order):
     nyquist = 0.5 * sample_rate
@@ -218,13 +186,8 @@ for run in runs:
                     raise ValueError(f"Invalid FILTER_TYPE: {FILTER_TYPE}")
             except Exception as e:
                 print(f"Filtering failed for Subject {sub}, Run {run}: {e}")
-            if not np.allclose(pupilSize, filtered_pupil):
-                print(f"[DEBUG] Filtering changed the signal for Subject {sub}")
-            else:
-                print(f"[WARNING] Filter made no difference for Subject {sub}")
 
         else:
-            print("UNFILTERED!")
             filtered_pupil = pupilSize  # fallback to unfiltered if filtering is off
         
         for i in range(0, len(filtered_pupil), SAMPLES_PER_EPOCH):

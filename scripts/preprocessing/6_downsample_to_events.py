@@ -17,6 +17,9 @@ import datetime
 EXP_TYPE = "encoding" # "encoding" or "recall"
 SAMPLE_HZ = 1 #50
 SUBJ_IDS = range(1001,1046) # keep range from 1001
+FILTER_TYPE = "lowpass"  # lowpass or bandpass
+LOWCUT_HZ = None#0.01 # Only used if FILTER_TYPE is "bandpass"
+HIGHCUT_HZ = 0.2 #0.3 # Used in both "lowpass" and "bandpass"
 
 # Paths
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
@@ -74,7 +77,7 @@ for run in runs:
             group_num = 3
 
         # Load pupil data
-        pupil_file = os.path.join(current_dat, f"{sub}_{group_num}_2SD_downsample_to_sec_{EXP_TYPE}.csv")
+        pupil_file = os.path.join(current_dat, f"{sub}_{group_num}_{run}_{FILTER_TYPE}_2SD_downsample_to_sec_{EXP_TYPE}.csv")
         if not os.path.exists(pupil_file):
             print(f"Missing pupil file for subject {sub}")
             continue
@@ -124,10 +127,8 @@ for run in runs:
             sheet = xl.parse(sheet_name)
 
             for _, row in sheet.iterrows():
-               # print(f"Processing row: start={row['Segment_start_time']}, end={row['Segment_end_time']}")s
                 start = time_str_to_sec(row['Segment_start_time'])
                 end = time_str_to_sec(row['Segment_end_time'])
-               # print(start, end)
                 if pd.isna(start) or pd.isna(end):
                     continue
 
@@ -137,7 +138,6 @@ for run in runs:
                 start_idx = int(absolute_start * SAMPLE_HZ)
                 end_idx = int(absolute_end * SAMPLE_HZ)
                 if start_idx >= len(pupil_array):
-                    #print("start_idx too long")
                     continue
                 end_idx = min(end_idx, len(pupil_array))
 
@@ -167,24 +167,12 @@ for run in runs:
                 })
                 event_num += 1
 
-               # print(f"Checking story: {sheet_name}")
-               # print(f"Max end: {max_end}, Start times: {sheet['Segment_start_time'].head()}")
-               # print(f"Pupil array length: {len(pupil_array)}")
-               # print(f"Start idx: {start_idx}, End idx: {end_idx}")
-               # print(f"Segment length: {len(segment)}")
-
         df_out = pd.DataFrame(event_rows)
-       # print("Sheet names in file:", xl.sheet_names)
-       # print("Keys in STORY_VALENCE:", STORY_VALENCE.keys())
-
-       # print("Columns in df_out:", df_out.columns)
-       # print("Number of rows:", len(df_out))
-       # print("First few rows:\n", df_out.head())
 
         df_out['z_pupil'] = stats.zscore(df_out['mean_pupil_size'], nan_policy='omit')
 
         # Save per subject
-        out_csv = os.path.join(current_save, f"{sub}_{group_num}_event_aligned.csv")
+        out_csv = os.path.join(current_save, f"{sub}_{group_num}_{run}_{FILTER_TYPE}_event_aligned.csv")
         df_out.to_csv(out_csv, index=False)
         print(f"Saved: {out_csv}")
 
@@ -205,7 +193,7 @@ for run in runs:
         plt.tight_layout()
 
         # Save plot
-        plot_path = os.path.join(current_save, f"{sub}_{group_num}_event_plot.png")
+        plot_path = os.path.join(current_save, f"{sub}_{group_num}_{run}_{FILTER_TYPE}_event_plot.png")
         plt.savefig(plot_path, dpi=300)
         plt.close()
         print(f"Saved plot: {plot_path}")
@@ -222,14 +210,11 @@ if EXP_TYPE == "encoding":
             group_num = (sub - 1000) % 3
             if group_num == 0:
                 group_num = 3
-            file_path = os.path.join(current_save, f"{sub}_{group_num}_event_aligned.csv")
+            file_path = os.path.join(current_save, f"{sub}_{group_num}_event_aligned_{run}.csv")
             if os.path.exists(file_path):
                 df = pd.read_csv(file_path)
                 df["group_num"] = group_num
                 group_event_data[group_num].append(df)
-            # if not os.path.exists(file_path):
-            #     print(f"Missing CSV for subject {sub} in group {group_num}")
-            #     continue
 
         for group_num, dfs in group_event_data.items():
             print(f"Plotting group {group_num} with {len(dfs)} subjects.")

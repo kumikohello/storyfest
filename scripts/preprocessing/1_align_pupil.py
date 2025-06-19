@@ -5,7 +5,6 @@
 import numpy as np
 import pandas as pd
 import os
-import math
 import mat73 # to load .mat files in MATLAB v7.3
 
 # ------------------ Hardcoded parameters ------------------ #
@@ -72,8 +71,6 @@ for sub in SUBJ_IDS:
 
         if pupil_end_idx == len(samples_time) - 1 and end_time > samples_time[-1]:
             print(f"Warning: Adjusted end_time {end_time} is after the last sample for subject {sub}. Using last available sample.")
-
-        print(f"Adjusted pupil_start_idx: {pupil_start_idx}, Adjusted pupil_end_idx: {pupil_end_idx}")
         
         # New array of samples during stimulus presentation
         pupilSize_encoding = samples_pupilSize[pupil_start_idx:pupil_end_idx]

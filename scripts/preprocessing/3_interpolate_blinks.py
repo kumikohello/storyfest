@@ -12,8 +12,6 @@
 import numpy as np
 import pandas as pd
 import os
-import scipy.io as sio
-import math
 import mat73 # to load .mat files in MATLAB v7.3
 
 # ------------------ Hardcoded parameters ------------------ #

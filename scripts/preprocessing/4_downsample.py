@@ -6,7 +6,6 @@
 import numpy as np
 import pandas as pd
 import os
-import math
 
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')

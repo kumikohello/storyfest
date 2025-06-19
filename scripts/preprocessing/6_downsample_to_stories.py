@@ -19,7 +19,7 @@ EXP_TYPE = "encoding"
 SUBJ_IDS = range(1001, 1046)
 FILTER_TYPE = "lowpass"  # lowpass or bandpass
 LOWCUT_HZ = None # Only used if FILTER_TYPE is "bandpass"
-HIGHCUT_HZ = 0.3 # Used in both "lowpass" and "bandpass"
+HIGHCUT_HZ = 0.2 # Used in both "lowpass" and "bandpass"
 
 # Paths
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
@@ -180,89 +180,3 @@ plot_name = f"all_stories_avg_time_courses_sorted_by_valence_{(FILTER_TYPE, LOWC
 plt.savefig(os.path.join(SAVE_PATH, plot_name), dpi=300)
 plt.close()
 print(f"Saved combined 6-story plot: {plot_name}")
-
-# # ---------- Group-Level Average Time Course Across All Runs ---------- #
-# # from collections import defaultdict
-
-# # all_story_segments = defaultdict(list)
-
-# # for run in runs:
-# #     current_save = os.path.join(SAVE_PATH, run)
-# #     for sub in SUBJ_IDS:
-# #         group_num = (sub - 1000) % 3 or 3
-# #         file_path = os.path.join(current_save, f"{sub}_{group_num}_story_aligned.csv")
-# #         if os.path.exists(file_path):
-# #             df = pd.read_csv(file_path)
-# #             df["subject"] = sub
-# #             df["group_num"] = group_num
-# #             for _, row in df.iterrows():
-# #                 story = row["story"]
-# #                 duration = int(row["story_duration_sec"])
-# #                 start_sec = int(row["story_start_sec"])
-# #                 end_sec = int(row["story_end_sec"])
-# #                 z = row["z_pupil"]
-# #                 if pd.isna(z):
-# #                     continue
-# #                 # Load full pupil time series to extract story-aligned segment
-# #                 run_path = os.path.join(DAT_PATH, run) if run else DAT_PATH
-# #                 pupil_file = os.path.join(run_path, f"{sub}_{group_num}_2SD_downsample_to_sec_{EXP_TYPE}.csv")
-# #                 if not os.path.exists(pupil_file):
-# #                     continue
-# #                 pupil_data = pd.read_csv(pupil_file)
-# #                 pupil_array = np.array(pupil_data["pupilSize"])
-# #                 segment = pupil_array[start_sec:end_sec]
-# #                 if len(segment) < 2:
-# #                     continue
-# #                 z_segment = stats.zscore(segment, nan_policy='omit')
-# #                 all_story_segments[story].append(z_segment)
-
-# # ---------- Plot Each Story with Individual & Average Lines ---------- #
-# for story, segments in all_story_segments.items():
-#     # Pad segments to same length
-#     max_len = max(len(seg) for seg in segments)
-#     padded = np.full((len(segments), max_len), np.nan)
-#     for i, seg in enumerate(segments):
-#         padded[i, :len(seg)] = seg
-#     avg_course = np.nanmean(padded, axis=0)
-
-#     plt.figure(figsize=(12, 5))
-#     for i in range(len(padded)):
-#         plt.plot(padded[i], alpha=0.3)
-
-#     plt.plot(avg_course, color='black', linewidth=3, label="Average")
-
-#     plt.title(f"{story}: Average Pupil Time Course Across Subjects")
-#     plt.xlabel("Time (s)")
-#     plt.ylabel("Standardized Pupil Size (z)")
-#     plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
-#     plt.legend()
-#     plt.tight_layout()
-
-#     plot_path = os.path.join(SAVE_PATH, f"{story}_average_time_course.png")
-#     plt.savefig(plot_path, dpi=300)
-#     plt.close()
-#     print(f"Saved combined time course plot: {plot_path}")
-
-# # ---------- Plot Average Time Course Only (No Individual Lines) ---------- #
-# for story, segments in all_story_segments.items():
-#     # Pad segments to same length
-#     max_len = max(len(seg) for seg in segments)
-#     padded = np.full((len(segments), max_len), np.nan)
-#     for i, seg in enumerate(segments):
-#         padded[i, :len(seg)] = seg
-#     avg_course = np.nanmean(padded, axis=0)
-
-#     plt.figure(figsize=(12, 5))
-#     plt.plot(avg_course, color='black', linewidth=3)
-
-#     plt.title(f"{story}: Average Pupil Time Course")
-#     plt.xlabel("Time (s)")
-#     plt.ylabel("Standardized Pupil Size (z)")
-#     plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
-#     plt.ylim(-1.0, 1.5)
-#     plt.tight_layout()
-
-#     plot_path = os.path.join(SAVE_PATH, f"{story}_avg_only_time_course.png")
-#     plt.savefig(plot_path, dpi=300)
-#     plt.close()
-#     print(f"Saved average-only time course plot: {plot_path}")

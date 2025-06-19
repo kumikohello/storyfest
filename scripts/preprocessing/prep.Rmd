@@ -13,7 +13,7 @@ library(lmerTest)
 ```
 
 ```{r}
-data2 = read.csv("/Users/UChicago/CASNL/storyfest/data/pupil/3_processed/8_stack_df/encoding/stacked_events.csv")
+data2 = read.csv("/Users/UChicago/CASNL/storyfest/data/pupil/3_processed/8_stack_df/encoding/stacked_events_lowpass.csv")
 
 # toExclude <- c(1001, 1013, 1025, 1030)
 # 

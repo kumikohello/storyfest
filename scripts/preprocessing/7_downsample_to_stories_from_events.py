@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
@@ -86,7 +85,7 @@ for run in runs:
         plt.legend(title="Valence")
         plt.tight_layout()
 
-        plot_path = os.path.join(current_output, f"{sub}_{group_num}_story_from_events_plot.png")
+        plot_path = os.path.join(current_output, f"{sub}_{group_num}_{run}_story_from_events_plot.png")
         plt.savefig(plot_path, dpi=300)
         plt.close()
         print(f"Saved plot: {plot_path}")

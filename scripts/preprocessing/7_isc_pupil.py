@@ -3,18 +3,11 @@
 # Description: This script calculates one-to-average ISC at the event level
 
 import os
-import glob
-import scipy.io as sio
 import numpy as np
-from numpy.fft import fft, ifft, fftfreq
+from numpy.fft import fft, ifft
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy import stats
-from matplotlib import gridspec
-import seaborn as sns
-from statsmodels.stats.multitest import multipletests
 from sklearn.utils import check_random_state
-from numpy import interp
 
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
@@ -24,46 +17,18 @@ DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed
 SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/7_isc', EXP_TYPE))
 
 FILTER_TYPE = "lowpass"  # "lowpass" or "bandpass"
-LOWCUT_HZ = None
-HIGHCUT_HZ = 4
+LOWCUT_HZ = None # Only used if FILTER_TYPE is "bandpass"
+HIGHCUT_HZ = 0.3 # Used in both "lowpass" and "bandpass"
 
 if not os.path.exists(SAVE_PATH):
     os.makedirs(SAVE_PATH)
     
-SUBJ_IDS = range(1001, 1043)
+SUBJ_IDS = range(1001, 1046)
 
 # Number of iterations for permutation test
 ITERATIONS = 5000
 
 # ------------------ Define functions ------------------ # 
-def isc_loo(df, thisSub_idx):
-    """
-    One-to-average ISC
-
-    Parameters:
-        df (pd.DataFrame): dataframe of pupilSize by subject
-        thisSub_idx (int): index of this subject's data column
-    
-    Returns:
-        corr (np.float): one-to-average ISC for a given subject
-
-    """
-
-    i = thisSub_idx
-    thisSubj = df.iloc[:,i]
-    everyoneElse = df.drop(df.columns[[i]], axis=1)
-    
-    # Average everyone else's data
-    avg = everyoneElse.mean(axis=1)
-    
-    # Create a temporary df to store thisSubj and avg
-    df_temp = pd.DataFrame({'thisSubj': thisSubj, 'avg': avg})
-    
-    # Correlate this Subject's data with the average of everyone else's
-    corr = df_temp.corr(method='pearson').iloc[0,1]
-    
-    return corr
-
 def phase_randomize(data, random_state=None):
     """Perform phase randomization on time-series signal (from nltools.stats)
 
@@ -132,8 +97,9 @@ story_data = defaultdict(list)
 for sub in SUBJ_IDS:
     group_num = (sub - 1000) % 3 or 3
     for run in ['run_1', 'run_2']:
-        file_path = os.path.join(DAT_PATH, run, f"{sub}_{group_num}_story_aligned.csv")
+        file_path = os.path.join(DAT_PATH, run, f"{sub}_{group_num}_{run}_{FILTER_TYPE}_story_aligned.csv")
         if not os.path.exists(file_path):
+            print(f"Missing pupil file for subject {sub}")
             continue
         df = pd.read_csv(file_path)
         for _, row in df.iterrows():
@@ -153,7 +119,7 @@ for sub in SUBJ_IDS:
             pupil_file = os.path.join(
                 DAT_PATH.replace('6_storylocked', '5_timelocked'),
                 run,
-                f"{sub}_{group_num}_2SD_downsample_to_sec_{EXP_TYPE}.csv"
+                f"{sub}_{group_num}_{run}_{FILTER_TYPE}_2SD_downsample_to_sec_{EXP_TYPE}.csv"
             )
             if not os.path.exists(pupil_file):
                 print(f"Missing pupil file for {sub} at {pupil_file}")
@@ -180,15 +146,11 @@ for sub in SUBJ_IDS:
                 continue
 
             story_data[story].append(z_segment)
-            print(f"✅ Added {story} from subject {sub} (len={len(z_segment)})")
-
-    print(f"Loaded subject {sub}, total stories so far: {len(story_data)}")
 
 # Step 2: Compute ISC + Permutation for each story
 isc_results = []
 
 for story, segments in story_data.items():
-    print(f"\nProcessing story: {story}")
 
     if len(segments) < 2:
         print("Not enough subjects.")

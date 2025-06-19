@@ -13,8 +13,6 @@
 import numpy as np
 import pandas as pd
 import os
-import scipy.stats as stats
-import math
 
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
@@ -94,9 +92,6 @@ def calc_prop_noisy(pupil_diff, cutoff):
     
     return prop_noisy
 
-# ------------------ Initialize arrays ------------------ #
-#pupil_diff_allsub = np.array([]) # To store everyone's derivative data
-
 # ------------------- Main ------------------ #
 for run in runs:
     # Configure paths for current run
@@ -175,10 +170,3 @@ for run in runs:
             # encoding 2 SD run_2: Excluded pts 1002, 1005, 1007, 1008, 1009, 1011, 1013, 1014, 1016, 1022, 1036, 1042
             # encoding 2 SD overlap: Excluded pts 1005, 1007, 1008, 1009, 1011, 1014, 1036, 1042
             # recall 2 SD: Excluded pts 1002, 1004, 1005, 1007, 1009, 1012, 1014, 1016, 1028
-            # have to exclude pts 1001, 
-
-
-
-
-
-
