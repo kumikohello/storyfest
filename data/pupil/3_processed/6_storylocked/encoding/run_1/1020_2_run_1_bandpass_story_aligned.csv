@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1020,Dont Look,1,negative,0,710,710,2.269099167914201,1.3295004661309082
+1020,Pool Party,2,positive,712,1086,374,-1.3303212829167015,-1.082268355927532
+1020,Grandfather Clocks,3,neutral,1088,1623,535,-0.08407972255053434,-0.24723211020337652

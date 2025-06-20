@@ -1,0 +1,3 @@
+subject,story,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1001,Pool Party,positive,0,374,374,1907.8972699911712,-0.9999999999999977
+1001,Sea Ice,neutral,376,757,381,2005.084631093253,1.0000000000000024

@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1020,Impatient Billionaire,4,positive,0,330,330,-1.7100828076888335,-1.2113153494032591
+1020,Natalie Wood,5,negative,332,1147,815,1.8738547274098307,1.2377465475866418
+1020,Sea Ice,6,neutral,1149,1530,381,0.023867154751805012,-0.02643119818338255

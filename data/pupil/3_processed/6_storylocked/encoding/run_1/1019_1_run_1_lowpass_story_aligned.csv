@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1019,Pool Party,1,positive,0,374,374,1931.5616048647971,0.1553566317019161
+1019,Sea Ice,2,neutral,376,757,381,1819.3003744966147,-1.295010742815621
+1019,Natalie Wood,3,negative,759,1574,815,2007.7481270029039,1.1396541111137048

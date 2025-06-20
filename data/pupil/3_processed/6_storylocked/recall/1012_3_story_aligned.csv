@@ -1,0 +1,3 @@
+subject,story,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1012,Sea Ice,neutral,0,381,381,6759.303991130553,1.0
+1012,Dont Look,negative,383,1093,710,6661.657588784221,-1.0

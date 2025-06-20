@@ -1,0 +1,5 @@
+subject,story,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1026,Dont Look,negative,0,710,710,1922.5657801257898,1.3758172046548889
+1026,Pool Party,positive,712,1086,374,1705.5881176314713,-1.1081879297410715
+1026,Grandfather Clocks,neutral,1088,1623,535,1847.4176351528342,0.5155057061934216
+1026,Impatient Billionaire,positive,1625,1955,330,1733.981468355606,-0.7831349811072337

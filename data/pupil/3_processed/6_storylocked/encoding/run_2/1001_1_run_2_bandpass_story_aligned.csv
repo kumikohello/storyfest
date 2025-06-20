@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1001,Grandfather Clocks,4,neutral,0,535,535,0.7848644188943764,-1.0714723583927277
+1001,Impatient Billionaire,5,positive,537,867,330,1.2516081318598913,1.335086064353198
+1001,Dont Look,6,negative,869,1579,710,0.9415458206104889,-0.2636137059604721

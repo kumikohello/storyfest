@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1030,Natalie Wood,4,negative,0,815,815,1282.9203839011304,-1.1366366188745844
+1030,Grandfather Clocks,5,neutral,817,1352,535,1376.4402101419341,-0.16040859240934974
+1030,Pool Party,6,positive,1354,1728,374,1516.060076382528,1.2970452112839415

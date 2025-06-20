@@ -1,0 +1,4 @@
+subject,story,order,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1003,Sea Ice,1,neutral,0,381,381,2362.165325036797,-0.7047973313863939
+1003,Dont Look,2,negative,383,1093,710,2362.106899551009,-0.7094137194545349
+1003,Impatient Billionaire,3,positive,1095,1425,330,2388.983714715761,1.414211050840821

@@ -1,0 +1,5 @@
+subject,story,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1007,Pool Party,positive,0,374,374,5697.480145903997,1.3606812438513038
+1007,Sea Ice,neutral,376,757,381,5553.293424629036,0.5567891250515057
+1007,Natalie Wood,negative,759,1574,815,5283.198022796513,-0.949088551736579
+1007,Grandfather Clocks,neutral,1576,2111,535,5279.737567568833,-0.9683818171662509

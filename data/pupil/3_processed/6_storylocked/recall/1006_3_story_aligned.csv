@@ -1,0 +1,5 @@
+subject,story,valence,story_start_sec,story_end_sec,story_duration_sec,mean_pupil_size,z_pupil
+1006,Sea Ice,neutral,0,381,381,6522.965146572438,1.694252921350407
+1006,Dont Look,negative,383,1093,710,6299.714534026376,-0.32791846516523043
+1006,Impatient Billionaire,positive,1095,1425,330,6237.2654097382465,-0.8935734965589689
+1006,Natalie Wood,negative,1427,2242,815,6283.723715529619,-0.4727609596261829
