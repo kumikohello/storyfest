@@ -48,7 +48,7 @@ Computes inter-subject correlation (ISC) of pupil dilation across subjects. This
 
 ---
 
-### 0. `8_stack_df.py`
+### 9. `8_stack_df.py`
 Stacks all processed pupil data (e.g., from all participants, all runs) into a single dataframe for downstream analysis and visualization. Helpful for group-level stats.
 
 ---
