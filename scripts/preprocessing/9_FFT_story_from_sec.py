@@ -1,3 +1,7 @@
+# Authors: Kumiko Ueda (kumiko@uchicago.edu)
+# Last Edited: June 23, 2025
+# Description: Convert timelocked pupil data to frequency using Fast Fourier Transformation
+
 import os
 import numpy as np
 import pandas as pd

@@ -1,3 +1,7 @@
+# Authors: Kumiko Ueda (kumiko@uchicago.edu)
+# Last Edited: June 23, 2025
+# Description: Calculate Peak Frequency
+
 import os
 import pandas as pd
 import numpy as np
