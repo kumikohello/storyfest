@@ -63,6 +63,16 @@ Performs peak frequency analysis on FFT pupil data.
 
 ---
 
+### 12. `11_mean_frequency.py`
+Performs mean frequency analysis on FFT pupil data.
+
+---
+
+### 13. `12_spectral_entropy.py`
+Calculates spectral entropy on FFT pupil data.
+
+---
+
 ## ⚠️ Notes
 
 - Output is saved under `data/pupil/3_processed/` in corresponding subfolders.
