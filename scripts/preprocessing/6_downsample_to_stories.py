@@ -17,8 +17,8 @@ from collections import defaultdict
 # ---------- Configuration ---------- #
 EXP_TYPE = "encoding"
 SUBJ_IDS = range(1001, 1046)
-FILTER_TYPE = "lowpass"  # lowpass or bandpass
-LOWCUT_HZ = None # Only used if FILTER_TYPE is "bandpass"
+FILTER_TYPE = "bandpass"  # lowpass or bandpass
+LOWCUT_HZ = 0.01 # Only used if FILTER_TYPE is "bandpass"
 HIGHCUT_HZ = 0.2 # Used in both "lowpass" and "bandpass"
 
 # Paths

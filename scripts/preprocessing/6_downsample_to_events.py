@@ -17,8 +17,8 @@ import datetime
 EXP_TYPE = "encoding" # "encoding" or "recall"
 SAMPLE_HZ = 1 #50
 SUBJ_IDS = range(1001,1046) # keep range from 1001
-FILTER_TYPE = "lowpass"  # lowpass or bandpass
-LOWCUT_HZ = None#0.01 # Only used if FILTER_TYPE is "bandpass"
+FILTER_TYPE = "bandpass"  # lowpass or bandpass
+LOWCUT_HZ = 0.01 # Only used if FILTER_TYPE is "bandpass"
 HIGHCUT_HZ = 0.2 #0.3 # Used in both "lowpass" and "bandpass"
 
 # Paths

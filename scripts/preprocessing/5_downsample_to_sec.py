@@ -15,11 +15,12 @@
 
 # Steps:
 # 1. Load downsampled (50 Hz; i.e., sampled every 20 ms) pupil data
-# 2. The TR for the brain data is 1 second. To align the pupil data to TRs, segment the data into 1-second epochs
+# 2. Apply either lowpass or bandpass filter.
+# 3. The TR for the brain data is 1 second. To align the pupil data to TRs, segment the data into 1-second epochs
 #    (i.e., 1 epoch = 50 samples)
-# 3. Identify the artifactual samples within each epoch by removing samples that are ± 3 s.d. outside the epoch mean
-# 4. Calculate the mean pupil diameter for each epoch from the remaining non-artifactual samples
-# 5. If an epoch is characterized by >40% artifactual samples, 
+# 4. Identify the artifactual samples within each epoch by removing samples that are ± 2 s.d. outside the epoch mean
+# 5. Calculate the mean pupil diameter for each epoch from the remaining non-artifactual samples
+# 6. If an epoch is characterized by >40% artifactual samples, 
 #    replace the mean pupil diameter for that epoch via linear interpolation across adjacent clean epochs
 
 import numpy as np
@@ -62,8 +63,8 @@ SUBJ_IDS = range(1001,1046)
 
 # ---------- Filtering Settings ---------- #
 APPLY_FILTER = True            # Set to False to skip filtering
-FILTER_TYPE = "lowpass"          # Options: "lowpass", "bandpass"
-LOWCUT_HZ = None                 # Only used if FILTER_TYPE is "bandpass"
+FILTER_TYPE = "bandpass"          # Options: "lowpass", "bandpass"
+LOWCUT_HZ = 0.01                 # Only used if FILTER_TYPE is "bandpass"
 HIGHCUT_HZ = 0.2                # Used in both "lowpass" and "bandpass"
 FILTER_ORDER = 3
 

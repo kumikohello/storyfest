@@ -3,7 +3,7 @@ import glob
 import os
 
 EXP_TYPE = "encoding"
-FILTER_TYPE = "lowpass"  # "lowpass" or "bandpass"
+FILTER_TYPE = "bandpass"  # "lowpass" or "bandpass"
 
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()

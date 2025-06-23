@@ -7,16 +7,12 @@ from scipy.stats import f_oneway, kruskal
 
 # === CONFIG ===
 EXP_TYPE = "encoding"  # "encoding" or "recall"
+FILTER_TYPE = "bandpass"  # "lowpass" or "bandpass"
 # Paths
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
 DAT_PATH = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/9_FFT_story_from_sec/{EXP_TYPE}'))
 SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/10_peak_freq_plots/{EXP_TYPE}'))
-os.makedirs(SAVE_PATH, exist_ok=True)
-
-# BASE_DIR = "/Users/UChicago/CASNL/storyfest/data/pupil/3_processed/9_convert_FFT/encoding"  # directory with run_1 and run_2
-# OUTPUT_CSV = "dominant_frequencies_summary.csv"
-# PLOT_DIR = "/Users/UChicago/CASNL/storyfest/data/pupil/3_processed/10_dominant_freq_plots"
 os.makedirs(SAVE_PATH, exist_ok=True)
 
 # Load all FFT files from both runs
@@ -82,9 +78,9 @@ for val in ['negative', 'neutral', 'positive']:
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Count")
     plt.tight_layout()
-    plt.savefig(os.path.join(SAVE_PATH, f"dominant_freq_hist_{val}.png"))
+    plt.savefig(os.path.join(SAVE_PATH, f"dominant_freq_hist_{val}_{FILTER_TYPE}.png"))
     plt.close()
-    print(f"Saved histogram: dominant_freq_hist_{val}.png")
+    print(f"Saved histogram: dominant_freq_hist_{val}_{FILTER_TYPE}.png")
 
 # === Statistical tests ===
 neg = summary_df[summary_df.valence == 'negative']['dominant_freq_Hz']
@@ -105,7 +101,7 @@ plt.title("Dominant Frequencies by Valence")
 plt.ylabel("Dominant Frequency (Hz)")
 plt.xlabel("Valence")
 plt.tight_layout()
-plt.savefig(os.path.join(SAVE_PATH, "violin_dominant_freq_by_valence.png"))
+plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_valence-{FILTER_TYPE}.png"))
 plt.close()
 print("Saved violin plot by valence")
 
@@ -118,6 +114,6 @@ plt.title("Dominant Frequencies by Story")
 plt.ylabel("Dominant Frequency (Hz)")
 plt.xlabel("Story")
 plt.tight_layout()
-plt.savefig(os.path.join(SAVE_PATH, "violin_dominant_freq_by_story.png"))
+plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_story_{FILTER_TYPE}.png"))
 plt.close()
 print("Saved violin plot by story")

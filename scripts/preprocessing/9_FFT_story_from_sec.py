@@ -161,7 +161,7 @@ for col_idx, val in enumerate(valence_labels):
         ax.set_title(story)
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("Power")
-        ax.set_ylim(0, 80000)
+        # ax.set_ylim(0, 80000)
         ax.grid(True)
         if row_idx == 0:
             ax.text(0.5, 1.2, val.capitalize(), transform=ax.transAxes, ha='center', fontsize=14, fontweight='bold')

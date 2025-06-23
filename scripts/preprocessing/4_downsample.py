@@ -1,11 +1,12 @@
 # Authors: Kruthi Gollapudi (kruthig@uchicago.edu), Jadyn Park (jadynpark@uchicago.edu), Kumiko Ueda (kumiko@uchicago.edu)
 # Last Edited: June 8, 2025
-# Description: The script downsamples the clean (interpolated) pupil data to 50 Hz
+# Description: The script applies lowpass of 4Hz and downsamples the clean (interpolated) pupil data to 50 Hz
 # Downsampled via averaging (i.e., taking the mean of every N samples)
 
+import os
 import numpy as np
 import pandas as pd
-import os
+from scipy.signal import butter, filtfilt
 
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
@@ -31,6 +32,14 @@ DOWNSAMPLE_RATE_MS = 1/DOWNSAMPLE_RATE_HZ * 1000 # 50 Hz in ms (20 ms)
 
 SUBJ_IDS = range(1001,1046)
 
+# ------------------ Filtering Function ------------------ #
+def lowpass_filter(data, sample_rate, cutoff, order=3):
+    nyquist = 0.5 * sample_rate
+    normal_cutoff = cutoff / nyquist
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, data)
+    return filtered_data
+
 # ------------------- Main ------------------ #
 for run in runs:
     # Set current paths
@@ -55,6 +64,12 @@ for run in runs:
             print(f"No Input File for Subject {sub}")
             continue
         dat = pd.read_csv(input_file)
+
+        # Apply 4 Hz lowpass filter
+        filtered_pupil = lowpass_filter(dat['pupilSize_clean'].values, SAMPLE_RATE_HZ, cutoff=4)
+
+        # Replace original signal with filtered one
+        dat['pupilSize_clean'] = filtered_pupil
         
         # Convert time to datetime and set as index
         dat['time_in_ms_corrected'] = pd.to_datetime(dat['time_in_ms_corrected'], unit='ms')
