@@ -24,12 +24,12 @@ Performs blink interpolation by identifying short-duration signal dropouts and f
 ---
 
 ### 4. `4_downsample.py`
-Downsamples the interpolated signal to a lower temporal resolution (e.g., from 500 Hz to 50 Hz). This reduces noise and file size while preserving the signal’s temporal structure.
+Applies lowpass filter of 4Hz to prevent aliasing (Aliased noise can corrupt low-frequency pupil signal). Downsamples the interpolated signal to a lower temporal resolution (e.g., from 500 Hz to 50 Hz). This reduces noise and file size while preserving the signal’s temporal structure.
 
 ---
 
 ### 5. `5_downsample_to_sec.py`
-An extension of the above script, this one downsamples pupil data to 1 sample per second (1 Hz), explicitly for alignment with second-wise event-level data.
+An extension of the above script, applies either bandpass (0.01-0.2Hz) or lowpass (-0.2Hz) filter, and downsamples pupil data to 1 sample per second (1 Hz), explicitly for alignment with second-wise event-level data.
 
 ---
 
@@ -48,13 +48,18 @@ Computes inter-subject correlation (ISC) of pupil dilation across subjects. This
 
 ---
 
-### 9. `8_stack_df.py`
+### 0. `8_stack_df.py`
 Stacks all processed pupil data (e.g., from all participants, all runs) into a single dataframe for downstream analysis and visualization. Helpful for group-level stats.
 
 ---
 
-### 10. `9_frequency_analysis.py`
-Performs spectral analysis on pupil data, including Fourier transforms and entropy metrics. Useful for examining signal complexity or frequency-domain dynamics across events or stories.
+### 10. `9_FFT_story_from_sec.py`
+Performs Fast Fourier Transform on pupil data from 5_timelocked. Converts pupil data to frequency data.
+
+---
+
+### 11. `10_peak_frequency_analysis.py`
+Performs peak frequency analysis on FFT pupil data.
 
 ---
 
