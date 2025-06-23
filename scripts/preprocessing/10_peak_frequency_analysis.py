@@ -54,7 +54,7 @@ for run in ["run_1", "run_2"]:
 # Save summary CSV
 summary_df = pd.DataFrame(summary_rows)
 summary_df = summary_df.sort_values(by="subject")
-csv_name = f"peak_frequencies_summary.csv"
+csv_name = f"peak_frequencies_summary_{EXP_TYPE}_{FILTER_TYPE}.csv"
 summary_df.to_csv(os.path.join(SAVE_PATH, csv_name), index=False)
 print(f"Saved dominant frequencies to {SAVE_PATH}")
 
@@ -78,7 +78,7 @@ for val in ['negative', 'neutral', 'positive']:
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Count")
     plt.tight_layout()
-    plt.savefig(os.path.join(SAVE_PATH, f"dominant_freq_hist_{val}_{FILTER_TYPE}.png"))
+    plt.savefig(os.path.join(SAVE_PATH, f"dominant_freq_hist_{val}_{EXP_TYPE}_{FILTER_TYPE}.png"))
     plt.close()
     print(f"Saved histogram: dominant_freq_hist_{val}_{FILTER_TYPE}.png")
 
@@ -90,8 +90,16 @@ pos = summary_df[summary_df.valence == 'positive']['dominant_freq_Hz']
 anova_result = f_oneway(neg, neut, pos)
 kruskal_result = kruskal(neg, neut, pos)
 
-print("\nANOVA result:", anova_result)
-print("Kruskal-Wallis result:", kruskal_result)
+# Save stats to CSV
+stats_summary = pd.DataFrame({
+    'Test': ['ANOVA', 'Kruskal-Wallis'],
+    'Statistic': [anova_result.statistic, kruskal_result.statistic],
+    'p_value': [anova_result.pvalue, kruskal_result.pvalue]
+})
+
+stats_file = os.path.join(SAVE_PATH, f'spectral_centroid_stats_{EXP_TYPE}_{FILTER_TYPE}.csv')
+stats_summary.to_csv(stats_file, index=False)
+print(f"Saved statistical test results to {stats_file}")
 
 # === Violin plot by valence ===
 plt.figure(figsize=(8, 5))
@@ -101,7 +109,7 @@ plt.title("Dominant Frequencies by Valence")
 plt.ylabel("Dominant Frequency (Hz)")
 plt.xlabel("Valence")
 plt.tight_layout()
-plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_valence-{FILTER_TYPE}.png"))
+plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_valence-{EXP_TYPE}-{FILTER_TYPE}.png"))
 plt.close()
 print("Saved violin plot by valence")
 
@@ -114,6 +122,6 @@ plt.title("Dominant Frequencies by Story")
 plt.ylabel("Dominant Frequency (Hz)")
 plt.xlabel("Story")
 plt.tight_layout()
-plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_story_{FILTER_TYPE}.png"))
+plt.savefig(os.path.join(SAVE_PATH, f"violin_dominant_freq_by_story_{EXP_TYPE}_{FILTER_TYPE}.png"))
 plt.close()
 print("Saved violin plot by story")
