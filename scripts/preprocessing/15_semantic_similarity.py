@@ -14,7 +14,7 @@ from functools import reduce
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
-DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/1_raw/recall/event_segmented_recall'))
+DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/recall_transcripts/event_segmented_recall'))
 SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/15_semantic_similarity'))
 EVENTS_PATH = os.path.normpath(os.path.join(_THISDIR, '../../experiment/Storyfest_Event_Segmentation.xlsx'))
 
@@ -34,6 +34,15 @@ STORY_VALENCE = {
     'Impatient Billionaire': 'positive',
     'Grandfather Clocks': 'neutral',
     'Dont Look': 'negative'
+}
+
+EVENT_COUNT = {
+    'Pool Party': 20,
+    'Sea Ice': 23,
+    'Natalie Wood': 55,
+    'Grandfather Clocks': 29,
+    'Impatient Billionaire': 17,
+    'Dont Look': 41
 }
 
 # Download model to local
@@ -76,7 +85,10 @@ for subid in SUBJ_IDS:
 
     for story in STORIES:
         if story not in xl.sheet_names:
-            print(f"Skipping sheet: {story} for sub {subid}")
+            print(f"Story {story} missing for Subj {subid} — inserting zeros")
+            n_events = EVENT_COUNT[story]
+            subj_cos_sim[story] = [0.0] * n_events
+            all_subject_event_similarities[story].append([0.0] * n_events)
             continue
 
         sheet = xl.parse(story)
@@ -118,9 +130,6 @@ for subid in SUBJ_IDS:
         
         subj_cos_sim[story] = cos_sim_list
         all_subject_event_similarities[story].append(cos_sim_list)
-            
-        # # Replace nan with zero
-        # cos_sim_list = [0 if np.isnan(x) else x for x in cos_sim_list]
 
     # ------------------ Save Results ------------------ #         
     # Save cosine similarity
@@ -128,32 +137,40 @@ for subid in SUBJ_IDS:
     story_event_frames = []
 
     for story, sim_list in subj_cos_sim.items():
-        sheet = xl.parse(story)
+        if story in xl.sheet_names:
+            sheet = xl.parse(story)
 
-        if 'event_number' not in sheet.columns:
-            print(f"Missing event_number in {story} for Subj {subid}")
-            continue
+            if 'event_number' not in sheet.columns:
+                print(f"Missing event_number in {story} for Subj {subid}")
+                event_nums = pd.Series(np.arange(1, len(sim_list) + 1))
+                continue
 
-        event_nums = sheet['event_number'].reset_index(drop=True)
-        orig_trans = sheet['Transcript'].reset_index(drop=True).astype(str)
-        subj_trans = sheet['Subj_Transcript'].reset_index(drop=True).astype(str)
+            event_nums = sheet['event_number'].reset_index(drop=True)
+            orig_trans = sheet['Transcript'].reset_index(drop=True).astype(str)
+            subj_trans = sheet['Subj_Transcript'].reset_index(drop=True).astype(str)
 
-        # Recalculate sim_list with the updated rule: 0 if subj_trans is missing
-        sim_list_fixed = []
-        for i in range(len(event_nums)):
-            if pd.isna(event_nums[i]):
-                continue  # Skip this row entirely
-            elif subj_trans[i].lower() == 'nan' or subj_trans[i].strip() == '':
-                sim_list_fixed.append(0.0)  # Empty recall = 0
-            else:
-                vec1 = embed([orig_trans[i]])[0]
-                vec2 = embed([subj_trans[i]])[0]
-                cos_sim = np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
-                sim_list_fixed.append(cos_sim)
+            # Recalculate sim_list with the updated rule: 0 if subj_trans is missing
+            sim_list_fixed = []
+            for i in range(len(event_nums)):
+                if pd.isna(event_nums[i]):
+                    continue  # Skip this row entirely
+                elif subj_trans[i].lower() == 'nan' or subj_trans[i].strip() == '':
+                    sim_list_fixed.append(0.0)  # Empty recall = 0
+                else:
+                    vec1 = embed([orig_trans[i]])[0]
+                    vec2 = embed([subj_trans[i]])[0]
+                    cos_sim = np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
+                    sim_list_fixed.append(cos_sim)
 
-        # Keep only non-NaN event_number rows
-        clean_event_nums = event_nums[~event_nums.isna()].reset_index(drop=True)
-        sim_series = pd.Series(sim_list_fixed)
+            # Keep only non-NaN event_number rows
+            clean_event_nums = event_nums[~event_nums.isna()].reset_index(drop=True)
+            sim_series = pd.Series(sim_list_fixed)
+
+        else:
+            # Story was missing entirely — use synthetic event numbers
+            print(f"Generating dummy event numbers for {story} for Subj {subid}")
+            clean_event_nums = pd.Series(np.arange(1, EVENT_COUNT[story] + 1))
+            sim_series = pd.Series(sim_list) # this is already all zeros
 
         df_story = pd.DataFrame({
             'event_number': clean_event_nums,
@@ -195,7 +212,7 @@ subject_eventwise_paths = [f for f in subject_eventwise_paths if f.endswith('.xl
 subject_event_dfs = []
 for fname in subject_eventwise_paths:
     fpath = os.path.join(SAVE_PATH, 'event', fname)
-    df = pd.read_excel(fpath)
+    df = pd.read_excel(fpath, engine='openpyxl')
 
     subid_match = re.search(r"sub_(\d+)", fname)
     if subid_match:
@@ -235,22 +252,8 @@ group_avg_df.to_excel(output_path, index=False)
 print(f"Saved group-level eventwise cosine similarity to: {output_path}")
 
 # ------------------ Save Group-Level Data ------------------ #
-# # Mean per subject per story
-# group_mean_df = pd.DataFrame(all_subject_mean_similarities)
-# if not os.path.exists(SAVE_PATH + '/group_mean'):
-#         os.makedirs(SAVE_PATH + '/group_mean')
-# group_mean_df.to_excel(os.path.join(SAVE_PATH + '/group_mean', "group_mean_cosine_similarity_per_story.xlsx"), index=False)
-# print("Saved group mean per story")
-
 # Plot average cosine similarity across events per story
 plt.figure(figsize=(10, 6))
-# for story in STORIES:
-#     # Pad shorter subjects with NaN, then compute mean across subjects per event
-#     max_len = max(len(s) for s in all_subject_event_similarities[story])
-#     story_matrix = np.array([np.pad(s, (0, max_len - len(s)), constant_values=np.nan) for s in all_subject_event_similarities[story]])
-#     story_mean_across_subj = np.nanmean(story_matrix, axis=0)
-
-#     plt.plot(range(1, len(story_mean_across_subj)+1), story_mean_across_subj, label=story)
 
 # Load group-averaged eventwise similarity
 group_avg_df = pd.read_excel(SAVE_PATH + '/group_mean/group_mean_eventwise_cosine_similarity.xlsx')
@@ -315,13 +318,6 @@ plot_positions = {
 }
 
 plt.figure(figsize=(18, 10))
-# # Load group-averaged eventwise similarity
-# group_avg_df = pd.read_excel(SAVE_PATH + '/group_mean/group_mean_eventwise_cosine_similarity.xlsx')
-
-# # Then, inside your plotting code:
-# for story in STORIES:
-#     avg_course = group_avg_df[story].values
-#     plt.plot(avg_course, label=story)
 
 for col_idx, valence in enumerate(valence_labels):
     stories = valence_bins[valence]

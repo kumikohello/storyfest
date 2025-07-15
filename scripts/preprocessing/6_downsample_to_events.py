@@ -17,8 +17,8 @@ import datetime
 EXP_TYPE = "encoding" # "encoding" or "recall"
 SAMPLE_HZ = 1 #50
 SUBJ_IDS = range(1001,1046) # keep range from 1001
-FILTER_TYPE = "bandpass"  # lowpass or bandpass
-LOWCUT_HZ = 0.01 # Only used if FILTER_TYPE is "bandpass"
+FILTER_TYPE = "lowpass"  # lowpass or bandpass
+LOWCUT_HZ = None #0.005 # Only used if FILTER_TYPE is "bandpass"
 HIGHCUT_HZ = 0.2 #0.3 # Used in both "lowpass" and "bandpass"
 
 # Paths
@@ -120,7 +120,6 @@ for run in runs:
             story_start_times.append((sheet_name, current_time))
             current_time += max_end + 2  # Add 2s gap after each story
 
-        event_num = 1
         for sheet_name, timeslot_start_sec in story_start_times:
             valence = STORY_VALENCE[sheet_name]
             timeslot_start_sec = dict(story_start_times)[sheet_name]
@@ -133,6 +132,7 @@ for run in runs:
                     continue
 
                 transcript = row['Transcript']
+                event_num = row['event_number']
                 absolute_start = timeslot_start_sec + start
                 absolute_end = timeslot_start_sec + end
                 start_idx = int(absolute_start * SAMPLE_HZ)
@@ -165,10 +165,9 @@ for run in runs:
                     "transcript": transcript,
                     "mean_pupil_size": mean_pupil
                 })
-                event_num += 1
 
         df_out = pd.DataFrame(event_rows)
-
+        df_out = df_out[df_out['event_num'].notna()]
         df_out['z_pupil'] = stats.zscore(df_out['mean_pupil_size'], nan_policy='omit')
 
         # Save per subject
