@@ -44,22 +44,47 @@ Aggregates pupil data by entire stories, aligning the full signal to narrative s
 ---
 
 ### 8. `7_isc_pupil.py`
-Computes inter-subject correlation (ISC) of pupil dilation across subjects. This measures the degree of synchronization in pupil responses to the same narrative, indicative of shared attention or emotion.
+Computes inter-subject correlation (ISC) of pupil dilation across subjects for each story. This measures the degree of synchronization in pupil responses to the same narrative, indicative of shared attention or emotion.
 
 ---
 
-### 9. `8_stack_df.py`
+### 9. `7_isc_pupil_event.py`
+Computes inter-subject correlation (ISC) of pupil dilation across subjects for each event. This measures the degree of synchronization in pupil responses to the same narrative, indicative of shared attention or emotion.
+
+---
+
+### 10. `8_stack_cosine_df.py`
+Stacks all processed pupil data (e.g., from all participants, all runs) into a single dataframe for downstream analysis and visualization. Helpful for group-level stats. Includes cosine similarity of recall data.
+
+---
+
+### 11. `8_stack_df.py`
 Stacks all processed pupil data (e.g., from all participants, all runs) into a single dataframe for downstream analysis and visualization. Helpful for group-level stats.
 
 ---
 
-### 10. `9_convert_FFT.py`
+### 12. `9_FFT_story_from_sec.py`
 Performs Fast Fourier Transformation on pupil data. Useful for examining signal complexity or frequency-domain dynamics across events or stories.
 
 ---
 
-### 11. `9_frequency_analysis.py`
-Performs spectral analysis on pupil data, including Fourier transforms and entropy metrics. Useful for examining signal complexity or frequency-domain dynamics across events or stories.
+### 13. `10_peak_frequency_analysis.py`
+Performs peak frequency analysis on FFT transformed pupil data.
+
+---
+
+### 14. `11_mean_frequency.py`
+Performs mean frequency analysis on FFT transformed pupil data.
+
+---
+
+### 15. `12_spectral_entropy.py`
+Performs spectral entropy on FFT transformed pupil data.
+
+---
+
+### 16. `15_semantic_similarity.py`
+Computes semantic similarity between the original transcript and each participants' recall transcript.
 
 ---
 
