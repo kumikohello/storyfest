@@ -1,0 +1,4 @@
+subject,group,story,valence,mean_pupil_size,z_pupil,run
+1022,1,Pool Party,positive,-0.07131437493727341,-0.07131437493727341,run_1
+1022,1,Sea Ice,neutral,-0.6454657786358522,-0.6454657786358522,run_1
+1022,1,Natalie Wood,negative,0.34830466019289347,0.34830466019289347,run_1
