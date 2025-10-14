@@ -357,38 +357,18 @@ classdef Edf2Mat < handle
             importer = @(varargin)edfimporter(varargin{:});
             if ~obj.oldProcedure  
                 if ismac
-                    [~, version] = unix('sw_vers -productVersion');
-                    version = regexp(version, '(?<major>\d+)\.(?<minor>\d+).(?<patch>\d+)', 'names');
+                    [~, versionStr] = unix('sw_vers -productVersion');  % Get macOS version string
+                    tokens = regexp(strtrim(versionStr), '^(\d+)\.(\d+)(?:\.(\d+))?', 'tokens');
                     
-                    if exist('version', 'var') && isstruct(version)
-                        if isfield(version, 'major')
-                            majorVal = version.major;
-                            if ~isempty(majorVal) && (ischar(majorVal) || isstring(majorVal))
-                                tokens = regexp(majorVal, '\d+$', 'match');
-                                if ~isempty(tokens)
-                                    majorNum = str2double(tokens{1});
-                                    if majorNum < 11
-                                        importer = @(varargin) edfimporter_pre11(varargin{:});
-                                    end
-                                else
-                                    warning('Unrecognized format for version.major: %s', majorVal);
-                                end
-                            else
-                                warning('version.major exists but is empty or not a string.');
-                            end
-                        else
-                            warning('version.major field not found.');
+                    if ~isempty(tokens)
+                        majorNum = str2double(tokens{1}{1});
+                        if majorNum < 11
+                            importer = @(varargin) edfimporter_pre11(varargin{:});
                         end
                     else
-                        warning('version struct not found or not a struct.');
+                        warning('Unable to parse macOS version: %s', versionStr);
                     end
 
-
-
-                    
-                    %if (str2double(version.major) < 11) 
-                       %importer = @(varargin)edfimporter_pre11(varargin{:});
-                    %end                
                 end
                 obj.RawEdf      = importer(obj.filename);
                 obj.Header.raw  = obj.RawEdf.HEADER;

@@ -4,14 +4,15 @@ import os
 import re
 
 # --------- YOU MAY EDIT THESE ---------
-os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
+os.chdir('/Users/UChicago/CASNL/storyfest/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
-
-ENCODING_CSV = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/8_stack_df/encoding/stacked_events_lowpass.csv'))
-COSINE_DIR = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/15_semantic_similarity/event/'))
-OUTPUT_DIR  = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/8_stack_cosine_df'))
+SDSCORE = 3
+FILTER_HZ = 0.4
+ENCODING_CSV = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/8_stack_df/course_filtered/', f'stacked_events_{FILTER_HZ}.csv'))
+COSINE_DIR = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/15_semantic_similarity/course/event/'))
+OUTPUT_DIR  = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/8_stack_cosine_df/course_filtered/'))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'stacked_events_lowpass_with_cosine.csv')
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, f'stacked_events_cosine_{FILTER_HZ}.csv')
 # --------------------------------------
 
 # Load the stacked events file (from encoding)
@@ -45,6 +46,7 @@ for f in cosine_files:
 cosine_long = pd.concat(long_frames, ignore_index=True)
 
 # Make sure key columns are same type
+stacked = stacked.dropna()
 for col in ['subject', 'event_num']:
     stacked[col] = stacked[col].astype(int)
     cosine_long[col] = cosine_long[col].astype(int)

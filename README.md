@@ -8,68 +8,78 @@ This repository contains scripts and data for preprocessing and analyzing pupil 
 
 All scripts below are located in `scripts/preprocessing/` and are designed to be run in sequential order as part of the pupil preprocessing pipeline.
 
-### 1. `1_align_pupil.py`
+### 1. `0_blinks.py`
+Extracts blinks from the asc files.
+
+---
+
+### 2. `0_timestamps.py`
+Extracts timestamps from the asc files.
+
+---
+
+### 3. `1_align_pupil.py`
 Aligns raw pupil data to TRs using timing information. This step ensures that all data streams are synchronized to a common timeline.
 
 ---
 
-### 2. `2_exclude_noisy_pts.py`
+### 4. `2_exclude_noisy_subj.py`
 Identifies and removes noisy participants based on pupil derivative statistics. Subjects are excluded if a large proportion of samples show abnormally high change between timepoints.
 
 ---
 
-### 3. `3_interpolate_blinks.py`
+### 5. `3_interpolate_blinks.py`
 Performs blink interpolation by identifying short-duration signal dropouts and filling them using linear interpolation. Helps to maintain continuity in the pupil signal.
 
 ---
 
-### 4. `4_downsample.py`
+### 6. `4_downsample.py`
 Applies lowpass filter of 4Hz to prevent aliasing (Aliased noise can corrupt low-frequency pupil signal). Downsamples the interpolated signal to a lower temporal resolution (e.g., from 500 Hz to 50 Hz). This reduces noise and file size while preserving the signal’s temporal structure.
 
 ---
 
-### 5. `5_downsample_to_sec.py`
-An extension of the above script, applies either bandpass (0.01-0.2Hz) or lowpass (-0.2Hz) filter, and downsamples pupil data to 1 sample per second (1 Hz), explicitly for alignment with second-wise event-level data.
+### 7. `5_standardize.py`
+An extension of the above script, applies either bandpass (0.01-0.2Hz) or lowpass (-0.2Hz) filter, and standardizes.
 
 ---
 
-### 6. `6_downsample_to_events.py`
-Segments and downsamples pupil data according to predefined event boundaries (e.g., narrative moments of interest). Useful for event-level analyses of arousal or attention.
-
----
-
-### 7. `6_downsample_to_stories.py`
+### 8. `6_segment_stories.py`
 Aggregates pupil data by entire stories, aligning the full signal to narrative start and end times. Useful for averaging time courses across longer narrative arcs.
 
 ---
 
-### 8. `7_isc_pupil.py`
+### 9. `7_segment_events.py`
+Segments and downsamples pupil data according to predefined event boundaries (e.g., narrative moments of interest). Useful for event-level analyses of arousal or attention.
+
+---
+
+### 10. `7_isc_pupil.py`
 Computes inter-subject correlation (ISC) of pupil dilation across subjects. This measures the degree of synchronization in pupil responses to the same narrative, indicative of shared attention or emotion.
 
 ---
 
-### 0. `8_stack_df.py`
+### 11. `8_stack_df.py`
 Stacks all processed pupil data (e.g., from all participants, all runs) into a single dataframe for downstream analysis and visualization. Helpful for group-level stats.
 
 ---
 
-### 10. `9_FFT_story_from_sec.py`
-Performs Fast Fourier Transform on pupil data from 5_timelocked. Converts pupil data to frequency data.
+### 12. `15_semantic_similarity.py`
+Calculates the semantic similarity.
 
 ---
 
-### 11. `10_peak_frequency_analysis.py`
-Performs peak frequency analysis on FFT pupil data.
+### 13. `16_sentiment_analysis.py`
+Calculates the cosine similarity score of the original transcript and participants recall transcript at the 20sec level.
 
 ---
 
-### 12. `11_mean_frequency.py`
-Performs mean frequency analysis on FFT pupil data.
+### 14. `16_coarse_sentiment_analysis.py`
+Calculates the cosine similarity score of the original transcript and participants recall transcript at the event level.
 
 ---
 
-### 13. `12_spectral_entropy.py`
-Calculates spectral entropy on FFT pupil data.
+### 15. `17_sentiment_centrality`
+Calculates the semantic centrality.
 
 ---
 

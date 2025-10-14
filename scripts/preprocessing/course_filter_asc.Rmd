@@ -1,0 +1,938 @@
+---
+title: "course_filter_asc"
+output: html_document
+date: "2025-08-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(ggeffects)
+library(tibble)
+```
+
+```{r}
+# Load df
+course_filter_data <- read.csv("/Users/UChicago/CASNL/storyfest/storyfest/data/pupil/3_processed/8_stack_cosine_df/course_filtered/stacked_events_cosine_0.1.csv") %>%
+  select(-c("event_start_sec", "event_end_sec", "event_duration_sec"))
+
+# Prep df -----------------------------------------------------------------
+total_num_events <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  total_num_events = c(7, 7, 8, 11, 17, 13)  # Example values
+)
+
+course_filter_data <- merge(course_filter_data, total_num_events, by = "story", all.x = TRUE)
+```
+
+```{r}
+# Drop rows where any of the relevant variables are NA
+# course_filter_data <- na.omit(course_filter_data[, c("subject", "group", "story", "event_num", "valence", "transcript", "mean_pupil_size", # "z_pupil", "cosine_similarity")])
+
+story_lengths <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  story_length_sec = c(367, 330, 381, 535, 815, 710)  # Example values
+)
+
+course_filter_data <- merge(course_filter_data, story_lengths, by = "story", all.x = TRUE)
+
+num_big_events <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  total_big_event_num = c(7, 6, 7, 10, 17, 12)  # Example values
+)
+
+course_filter_data <- merge(course_filter_data, num_big_events, by = "story", all.x = TRUE)
+
+num_events <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  total_event_num = c(20, 17, 23, 29, 55, 41)  # Example values
+)
+
+course_filter_data <- merge(course_filter_data, num_events, by = "story", all.x = TRUE)
+
+valence_value_avg <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  valence_value_avg = c(-0.248309816, -0.236145799, -0.22905375, -0.135432345, -0.4539609, -0.331875203)
+)
+
+valence_value_avg$valence_label <- c("positive", "positive", "neutral", "neutral", "negative", "negative")
+
+valence_value_avg$story <- factor(valence_value_avg$story, levels = valence_value_avg$story[order(valence_value_avg$valence_value_avg)])
+```
+
+```{r}
+course_filter_data <- merge(course_filter_data, valence_value_avg, by = "story", all.x = TRUE)
+
+sentiment_files <- list.files(
+  path = "/Users/UChicago/CASNL/storyfest/storyfest/data/pupil/3_processed/16_course_sentiment_by_event_transformer/my_transformer", 
+  pattern = "_sentiment_transformer_copy.csv$", 
+  full.names = TRUE
+)
+
+valence_list <- lapply(sentiment_files, function(file) {
+  df <- read.csv(file)
+  df$story <- gsub("_sentiment_transformer_copy.csv", "", basename(file))  # extract story name
+  return(df)
+})
+
+valence_df <- do.call(rbind, valence_list)
+
+valence_df <- valence_df %>%
+  rename(event_num = event_number)
+
+valence_df <- valence_df %>%
+  rename(valence_event_label = predicted_label)
+
+course_filter_data <- merge(course_filter_data, valence_df[, c("story", "event_num", "valence_event_label", "valence_event_continuous", "arousal_event_score")],
+               by = c("story", "event_num"),
+               all.x = TRUE)
+
+course_filter_data$story<-as.factor(course_filter_data$story)
+course_filter_data$valence<-as.factor(course_filter_data$valence)
+course_filter_data$subject<-as.factor(course_filter_data$subject)
+course_filter_data$valence <- relevel(course_filter_data$valence, ref="neutral")
+course_filter_data$valence_event_label<-as.factor(course_filter_data$valence_event_label)
+course_filter_data$valence_event_label <- relevel(course_filter_data$valence_event_label, ref="neutral")
+
+# pos, neu, neg data
+course_filter_pos_data <- course_filter_data %>%
+  filter(story %in% c("Pool Party", "Impatient Billionaire"))
+
+course_filter_pos_data$valence_event_label<-as.factor(course_filter_pos_data$valence_event_label)
+course_filter_pos_data$valence_event_label <- relevel(course_filter_pos_data$valence_event_label, ref="neutral")
+
+course_filter_neu_data <- course_filter_data %>%
+  filter(story %in% c("Sea Ice", "Grandfather Clocks"))
+
+course_filter_neu_data$valence_event_label<-as.factor(course_filter_neu_data$valence_event_label)
+course_filter_neu_data$valence_event_label <- relevel(course_filter_neu_data$valence_event_label, ref="neutral")
+
+course_filter_neg_data <- course_filter_data %>%
+  filter(story %in% c("Dont Look", "Natalie Wood"))
+
+course_filter_neg_data$valence_event_label<-as.factor(course_filter_neg_data$valence_event_label)
+course_filter_neg_data$valence_event_label <- relevel(course_filter_neg_data$valence_event_label, ref="neutral")
+```
+
+```{r}
+story_order <- c("Dont Look", "Natalie Wood", "Sea Ice",
+                 "Grandfather Clocks", "Impatient Billionaire", "Pool Party")
+
+# If you’re starting from per-event rows:
+valence_by_story <- course_filter_data %>%
+  group_by(story, valence_label) %>%
+  summarise(
+    n_events     = sum(!is.na(valence_event_continuous)),
+    mean_valence = mean(valence_event_continuous, na.rm = TRUE),
+    sd_valence   = sd(valence_event_continuous,   na.rm = TRUE),
+    se_valence   = sd_valence / sqrt(n_events),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    story = factor(story, levels = story_order),
+    valence_label = factor(valence_label, levels = c("negative", "neutral", "positive"))
+  )
+
+p <- ggplot(valence_by_story, aes(x = story, y = mean_valence, fill = valence_label)) +
+  geom_col(position = position_dodge(0.9)) +
+  geom_errorbar(aes(ymin = mean_valence - se_valence, ymax = mean_valence + se_valence),
+                width = 0.2, position = position_dodge(0.9)) +
+  scale_x_discrete(limits = story_order) +  # hard-enforce left→right order
+  scale_fill_manual(
+    values = c("negative"="blue","neutral"="gray","positive"="red"),
+    limits = c("negative","neutral","positive")  # bar/legend order within each story
+  ) +
+  labs(title="Valence (Mean Across Events) per Story",
+       x="Story", y="Mean Valence (± SE)", fill="Valence") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_cartesian(ylim = c(-0.5, NA))
+p
+```
+
+```{r}
+# valence predict pupil size
+mdl_course_filter_2 = lmer(data=course_filter_data, z_pupil~valence + (1|subject) + (1|story))
+summary(mdl_course_filter_2)
+
+mdl_course_filter_2_2 = lmer(data=course_filter_data, z_pupil~valence + (1|subject) + (1|story)  + total_num_events)
+summary(mdl_course_filter_2_2)
+
+mdl_course_filter_3 = lmer(data=course_filter_data, z_pupil~valence_event_label + (1|subject) + (1|story))
+summary(mdl_course_filter_3)
+
+mdl_course_filter_5 = lmer(data=course_filter_data, z_pupil~arousal_event_score + (1|subject) + (1|story))
+summary(mdl_course_filter_5)
+```
+
+```{r}
+# valence predict cosine similarity
+mdl2_course_filter = lmer(data=course_filter_data, cosine_similarity~valence + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter)
+
+mdl2_course_filter_2 = lmer(data=course_filter_data, cosine_similarity~valence_event_label + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter_2)
+
+mdl2_course_filter_pos = lmer(data=course_filter_pos_data, cosine_similarity~valence_event_label + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter_pos)
+
+mdl2_course_filter_neg = lmer(data=course_filter_neg_data, cosine_similarity~valence_event_label + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter_neg)
+
+mdl2_course_filter_neu = lmer(data=course_filter_neu_data, cosine_similarity~valence_event_label + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter_neu)
+
+mdl2_course_filter_4 = lmer(data=course_filter_data, cosine_similarity~arousal_event_score + (1|subject) + (1|story) + total_num_events)
+summary(mdl2_course_filter_4)
+```
+
+```{r}
+# pupil predict memory
+mdl3_course_filter <- lmer(data = course_filter_data, cosine_similarity~z_pupil +  (1|subject) + (1|story) +  total_num_events)
+summary(mdl3_course_filter)
+
+mdl3_course_filter_pos = lmer(data=course_filter_pos_data, cosine_similarity~z_pupil + (1|subject) + (1|story))
+summary(mdl3_course_filter_pos)
+
+mdl3_course_filter_neg = lmer(data=course_filter_neg_data, cosine_similarity~z_pupil + (1|subject) + (1|story))
+summary(mdl3_course_filter_neg)
+
+
+course_filter_emotional = rbind(course_filter_pos_data,course_filter_neg_data)
+res99 = lmer(data=course_filter_emotional, cosine_similarity ~ z_pupil * valence + (1|subject) + (1|story))
+summary(res99)
+
+
+
+mdl3_course_filter_neu = lmer(data=course_filter_neu_data, cosine_similarity~z_pupil + (1|subject) + (1|story))
+summary(mdl3_course_filter_neu)
+```
+
+```{r}
+# 1) Normal-approx posterior draws for beta_zpupil
+b_hat <- fixef(mdl3_course_filter)["z_pupil"]
+se_b  <- sqrt(vcov(mdl3_course_filter)["z_pupil","z_pupil"])
+set.seed(123)
+beta_draws <- rnorm(8000, mean = b_hat, sd = se_b)
+
+# 2) Boxed posterior plot (single distribution)
+plot_posterior_boxed <- function(draws, title_text = NULL, hist_fill = "#9bd3e6") {
+  m   <- mean(draws)
+  ci  <- quantile(draws, c(0.025, 0.975))
+  pgt <- mean(draws > 0)
+
+  dens <- density(draws); ymax <- max(dens$y)
+  df <- tibble(mu = draws)
+
+  ggplot(df, aes(x = mu)) +
+    geom_histogram(aes(y = after_stat(density)),
+                   bins = 40, fill = hist_fill, alpha = 0.85, color = NA) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.7) +
+    geom_segment(aes(x = ci[1], xend = ci[2], y = 0, yend = 0),
+                 inherit.aes = FALSE, linewidth = 3.0, color = "black") +
+    annotate("text", x = ci[1], y = 0, label = sprintf("%.3f", ci[1]),
+             vjust = -1.1, size = 4) +
+    annotate("text", x = ci[2], y = 0, label = sprintf("%.3f", ci[2]),
+             vjust = -1.1, size = 4) +
+    annotate("text", x = m, y = 0.85 * ymax, label = sprintf("Mean=%.3f", m),
+             size = 5, fontface = "bold") +
+    annotate("text", x = m, y = 0.72 * ymax, label = sprintf("P(posterior > 0)=%.3f", pgt),
+             size = 4.5) +
+    labs(x = "Posterior distribution (β for z_pupil)", y = NULL, title = title_text) +
+    coord_cartesian(ylim = c(0, ymax * 1.05)) +
+    theme_classic(base_size = 14) +
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+}
+
+p <- plot_posterior_boxed(beta_draws, title_text = "Pupil predicts memory (β for z_pupil)")
+print(p)
+```
+
+```{r}
+# ---- helper: posterior draws for a fixed-effect term from an lmer model ----
+get_beta_draws_from_lmer <- function(mod, term = "z_pupil", n_draws = 8000) {
+  # try full MVN sim of fixed effects if 'arm' is available; fallback to normal approx for the term
+  if (requireNamespace("arm", quietly = TRUE)) {
+    s <- arm::sim(mod, n.sims = n_draws)
+    beta_mat <- as.matrix(coef(s))  # sims x terms
+    if (!term %in% colnames(beta_mat)) stop(sprintf("Term '%s' not found in model.", term))
+    as.numeric(beta_mat[, term])
+  } else {
+    b  <- fixef(mod)
+    V  <- vcov(mod)
+    if (!term %in% names(b)) stop(sprintf("Term '%s' not found in model.", term))
+    mean <- b[term]
+    sd   <- sqrt(V[term, term])
+    rnorm(n_draws, mean = mean, sd = sd)
+  }
+}
+
+# ---- boxed posterior plot (histogram + dashed 0, baseline 95% CI, annotations) ----
+plot_posterior_boxed <- function(draws, title_text = NULL, hist_fill = "#CFCFCF",
+                                 prob_side = c(">", "<")[1]) {
+  m   <- mean(draws)
+  ci  <- quantile(draws, c(0.025, 0.975))
+  p   <- if (prob_side == ">") mean(draws > 0) else mean(draws < 0)
+  prob_lab <- if (prob_side == ">") sprintf("P(posterior > 0)=%.3f", p)
+                                else sprintf("P(posterior < 0)=%.3f", p)
+
+  dens <- density(draws); ymax <- max(dens$y)
+  df <- tibble(mu = draws)
+
+  ggplot(df, aes(x = mu)) +
+    geom_histogram(aes(y = after_stat(density)),
+                   bins = 40, fill = hist_fill, alpha = 0.85, color = NA) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.7) +
+    geom_segment(aes(x = ci[1], xend = ci[2], y = 0, yend = 0),
+                 inherit.aes = FALSE, linewidth = 3.0, color = "black") +
+    annotate("text", x = ci[1], y = 0, label = sprintf("%.3f", ci[1]),
+             vjust = -1.1, size = 4) +
+    annotate("text", x = ci[2], y = 0, label = sprintf("%.3f", ci[2]),
+             vjust = -1.1, size = 4) +
+    annotate("text", x = m, y = 0.85 * ymax, label = sprintf("Mean=%.3f", m),
+             size = 5, fontface = "bold") +
+    annotate("text", x = m, y = 0.72 * ymax, label = prob_lab,
+             size = 4.5) +
+    labs(x = "Posterior distribution (β for z_pupil)", y = NULL, title = title_text) +
+    coord_cartesian(ylim = c(0, ymax * 1.05)) +
+    theme_classic(base_size = 14) +
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+}
+
+# ---- soft colors (your picks) ----
+valence_cols <- c(
+  positive = "#EFA3A3",   # soft red
+  negative = "#9BC7E3",   # soft blue
+  neutral  = "#CFCFCF"    # soft gray
+)
+
+# ---- build the three posteriors (term = "z_pupil") ----
+draws_pos <- get_beta_draws_from_lmer(mdl3_course_filter_pos, term = "z_pupil")
+draws_neg <- get_beta_draws_from_lmer(mdl3_course_filter_neg, term = "z_pupil")
+draws_neu <- get_beta_draws_from_lmer(mdl3_course_filter_neu, term = "z_pupil")
+
+p_pos <- plot_posterior_boxed(draws_pos, "Valence: Positive",
+                              hist_fill = valence_cols["positive"], prob_side = ">")
+p_neg <- plot_posterior_boxed(draws_neg, "Valence: Negative",
+                              hist_fill = valence_cols["negative"], prob_side = "<")  # show P(<0)
+p_neu <- plot_posterior_boxed(draws_neu, "Valence: Neutral",
+                              hist_fill = valence_cols["neutral"],  prob_side = ">")
+
+# view
+print(p_pos); print(p_neg); print(p_neu)
+
+```
+
+```{r}
+# install.packages("brms")
+library(brms)
+library(bayestestR)
+
+# install.packages("cmdstanr", repos=c("https://mc-stan.org/r-packages/", getOption("repos")))
+library(cmdstanr)
+cmdstanr::install_cmdstan()
+options(brms.backend = "cmdstanr")
+
+
+```
+
+```{r}
+# Set priors
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+# Fit linear model
+fit_recall_pupil <- brm(
+ # recall_accuracy_z ~ pupil_size_z + (1 | subj),
+  cosine_similarity ~ z_pupil + (1 | subject),
+  data = course_filter_data,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_pupil <- as_draws_df(fit_recall_pupil)$b_z_pupil
+b_recall_pupil = median(post_recall_pupil)
+
+# Summary of posterior
+# posterior_interval(post_recall_pupil, prob = 0.95)
+hdi_recall_pupil <- hdi(post_recall_pupil, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_recall_pupil_pos <- sum(post_recall_pupil > 0)/length(post_recall_pupil)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_recall_pupil),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_pupil$CI_low, 2), ", ",
+                       round(hdi_recall_pupil$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_recall_pupil_pos, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_recall_pupil), aes(x=post_recall_pupil)) + 
+  geom_histogram(fill="lightblue") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_pupil$CI_low, xmin=hdi_recall_pupil$CI_low, xmax=hdi_recall_pupil$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_pupil$CI_low, y=1, label=round(hdi_recall_pupil$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_pupil$CI_high, y=1, label=round(hdi_recall_pupil$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_pupil), y=5, label=paste0("Median=", round(median(post_recall_pupil),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_pupil), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_pupil_pos, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/recall_pupil_hist.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+```{r}
+# Set priors
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+# Fit linear model
+fit_recall_pupil_pos <- brm(
+ # recall_accuracy_z ~ pupil_size_z + (1 | subj),
+  cosine_similarity ~ z_pupil + (1 | subject),
+  data = course_filter_pos_data,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_pupil_pos <- as_draws_df(fit_recall_pupil_pos)$b_z_pupil
+b_recall_pupil_pos = median(post_recall_pupil_pos)
+
+# Summary of posterior
+# posterior_interval(post_recall_pupil, prob = 0.95)
+hdi_recall_pupil_pos <- hdi(post_recall_pupil_pos, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_recall_pupil_pos <- sum(post_recall_pupil_pos > 0)/length(post_recall_pupil_pos)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_recall_pupil_pos),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_pupil_pos$CI_low, 2), ", ",
+                       round(hdi_recall_pupil_pos$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_recall_pupil_pos, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_recall_pupil_pos), aes(x=post_recall_pupil_pos)) + 
+  geom_histogram(fill="#9BC7E3") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_pupil_pos$CI_low, xmin=hdi_recall_pupil_pos$CI_low, xmax=hdi_recall_pupil_pos$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_pupil_pos$CI_low, y=1, label=round(hdi_recall_pupil_pos$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_pupil_pos$CI_high, y=1, label=round(hdi_recall_pupil_pos$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_pupil_pos), y=5, label=paste0("Median=", round(median(post_recall_pupil_pos),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_pupil_pos), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_pupil_pos, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/recall_pupil_hist_pos.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+```{r}
+# Set priors
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+# Fit linear model
+fit_recall_pupil_neu <- brm(
+ # recall_accuracy_z ~ pupil_size_z + (1 | subj),
+  cosine_similarity ~ z_pupil + (1 | subject),
+  data = course_filter_neu_data,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_pupil_neu <- as_draws_df(fit_recall_pupil_neu)$b_z_pupil
+b_recall_pupil_neu = median(post_recall_pupil_neu)
+
+# Summary of posterior
+# posterior_interval(post_recall_pupil, prob = 0.95)
+hdi_recall_pupil_neu <- hdi(post_recall_pupil_neu, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_recall_pupil_neu <- sum(post_recall_pupil_neu > 0)/length(post_recall_pupil_neu)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_recall_pupil_neu),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_pupil_neu$CI_low, 2), ", ",
+                       round(hdi_recall_pupil_neu$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_recall_pupil_neu, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_recall_pupil_neu), aes(x=post_recall_pupil_neu)) + 
+  geom_histogram(fill="#CFCFCF") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_pupil_neu$CI_low, xmin=hdi_recall_pupil_neu$CI_low, xmax=hdi_recall_pupil_neu$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_pupil_neu$CI_low, y=1, label=round(hdi_recall_pupil_neu$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_pupil_neu$CI_high, y=1, label=round(hdi_recall_pupil_neu$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_pupil_neu), y=5, label=paste0("Median=", round(median(post_recall_pupil_neu),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_pupil_neu), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_pupil_neu, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/recall_pupil_hist_neu.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+```{r}
+# Set priors
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+# Fit linear model
+fit_recall_pupil_neg <- brm(
+ # recall_accuracy_z ~ pupil_size_z + (1 | subj),
+  cosine_similarity ~ z_pupil + (1 | subject),
+  data = course_filter_neg_data,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_pupil_neg <- as_draws_df(fit_recall_pupil_neg)$b_z_pupil
+b_recall_pupil_neg = median(post_recall_pupil_neg)
+
+# Summary of posterior
+# posterior_interval(post_recall_pupil, prob = 0.95)
+hdi_recall_pupil_neg <- hdi(post_recall_pupil_neg, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_recall_pupil_neg <- sum(post_recall_pupil_neg > 0)/length(post_recall_pupil_neg)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_recall_pupil_neg),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_pupil_neg$CI_low, 2), ", ",
+                       round(hdi_recall_pupil_neg$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_recall_pupil_neg, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_recall_pupil_neg), aes(x=post_recall_pupil_neg)) + 
+  geom_histogram(fill="#EFA3A3") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_pupil_neg$CI_low, xmin=hdi_recall_pupil_neg$CI_low, xmax=hdi_recall_pupil_neg$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_pupil_neg$CI_low, y=1, label=round(hdi_recall_pupil_neg$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_pupil_neg$CI_high, y=1, label=round(hdi_recall_pupil_neg$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_pupil_neg), y=5, label=paste0("Median=", round(median(post_recall_pupil_neg),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_pupil_neg), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_pupil_neg, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/recall_pupil_hist_neg.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+
+```{r}
+# Set priors
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+# Fit linear model
+fit_pupil_valence <- brm(
+ # recall_accuracy_z ~ pupil_size_z + (1 | subj),
+  z_pupil ~ valence + (1 | subject),
+  data = course_filter_data,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_pupil_valence_pos <- as_draws_df(fit_pupil_valence)$b_valencepositive
+post_pupil_valence_neg <- as_draws_df(fit_pupil_valence)$b_valencenegative
+
+b_pupil_valence_pos = median(post_pupil_valence_pos)
+b_pupil_valence_neg = median(post_pupil_valence_neg)
+
+# Summary of posterior
+# posterior_interval(post_recall_pupil, prob = 0.95)
+hdi_pupil_valence_pos <- hdi(post_pupil_valence_pos, ci=0.95, method="HDI")
+hdi_pupil_valence_neg <- hdi(post_pupil_valence_neg, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_pupil_valence_pos <- sum(post_pupil_valence_pos > 0)/length(post_pupil_valence_pos)
+gt_0_pupil_valence_neg <- sum(post_pupil_valence_neg > 0)/length(post_pupil_valence_neg)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_pupil_valence_pos),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_pupil_valence_pos$CI_low, 2), ", ",
+                       round(hdi_pupil_valence_pos$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_pupil_valence_pos, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_pupil_valence_pos), aes(x=post_pupil_valence_pos)) + 
+  geom_histogram(fill="#9BC7E3") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_pupil_valence_pos$CI_low, xmin=hdi_pupil_valence_pos$CI_low, xmax=hdi_pupil_valence_pos$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_pupil_valence_pos$CI_low, y=1, label=round(hdi_pupil_valence_pos$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_pupil_valence_pos$CI_high, y=1, label=round(hdi_pupil_valence_pos$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_pupil_valence_pos), y=5, label=paste0("Median=", round(median(post_pupil_valence_pos),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_pupil_valence_pos), y=1, label=paste0("P(posterior > 0)=", round(gt_0_pupil_valence_pos, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/pupil_valence_hist_pos.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+```{r}
+# === ** Report ** === #
+cat("b:", round(median(b_pupil_valence_neg),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_pupil_valence_neg$CI_low, 2), ", ",
+                       round(hdi_pupil_valence_neg$CI_high, 2), "]"), "\n")
+cat("p(b>0):", round(gt_0_pupil_valence_neg, 3), "\n")
+
+
+
+# === ** Figure ** === #
+hist_recall_pupil <- ggplot(data.frame(post_pupil_valence_neg), aes(x=post_pupil_valence_neg)) + 
+  geom_histogram(fill="#EFA3A3") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_pupil_valence_neg$CI_low, xmin=hdi_pupil_valence_neg$CI_low, xmax=hdi_pupil_valence_neg$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_pupil_valence_neg$CI_low, y=1, label=round(hdi_pupil_valence_neg$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_pupil_valence_neg$CI_high, y=1, label=round(hdi_pupil_valence_neg$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_pupil_valence_neg), y=5, label=paste0("Median=", round(median(post_pupil_valence_neg),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_pupil_valence_neg), y=1, label=paste0("P(posterior > 0)=", round(gt_0_pupil_valence_neg, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_pupil
+
+# Save plot
+ggsave(
+  paste0("/Users/UChicago/CASNL/pupil_valence_hist_neg.png"),
+  hist_recall_pupil,
+  bg='transparent',
+  width=6, height=3, dpi=300
+)
+```
+
+
+```{r}
+library(lme4)
+library(emmeans)
+library(dplyr)
+library(ggplot2)
+
+# Make sure 'valence' is a 2-level factor
+course_filter_emotional <- course_filter_emotional %>%
+  mutate(valence = factor(valence, levels = c("negative","positive")))
+
+res99 <- lmer(cosine_similarity ~ z_pupil * valence + (1|subject) + (1|story),
+              data = course_filter_emotional)
+
+# ----- Simple slopes forest (unchanged; no new-levels issue) -----
+slopes <- emtrends(res99, ~ valence, var = "z_pupil")
+slopes_df <- as.data.frame(slopes) %>%
+  rename(slope = z_pupil.trend, lower = lower.CL, upper = upper.CL)
+
+p_forest <- ggplot(slopes_df, aes(x = slope, y = valence)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_pointrange(aes(xmin = lower, xmax = upper), size = 0.6) +
+  labs(x = "Slope of z_pupil on cosine_similarity", y = NULL) +
+  theme_minimal()
+
+# # ----- Marginal effects lines WITHOUT random effects -----
+newdat <- expand.grid(
+  z_pupil = seq(-2, 2, length.out = 50),
+  valence = levels(course_filter_emotional$valence)
+)
+
+pred_fix <- predict(res99, newdata = newdat, re.form = NA, se.fit = TRUE)  # fixed-effects only
+
+newdat$fit   <- pred_fix$fit
+newdat$lower <- pred_fix$fit - 1.96 * pred_fix$se.fit
+newdat$upper <- pred_fix$fit + 1.96 * pred_fix$se.fit
+
+p_lines <- ggplot(newdat, aes(x = z_pupil, y = fit, color = valence, fill = valence)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.15, color = NA) +
+  geom_line(size = 1) +
+  labs(x = "z_pupil", y = "Predicted cosine_similarity") +
+  theme_minimal()
+
+p_forest
+p_lines
+
+```
+
+```{r}
+library(lme4)
+library(emmeans)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# --- 0) Factor hygiene (good to keep) ---
+course_filter_emotional <- course_filter_emotional %>%
+  mutate(
+    valence = factor(valence, levels = c("negative","positive")),
+    subject = factor(subject),
+    story   = factor(story)
+  )
+
+# --- 1) Fit model ---
+res99 <- lmer(
+  cosine_similarity ~ z_pupil * valence + total_num_events +
+    (1 | subject) + (1 | story),
+  data = course_filter_emotional,
+  REML = TRUE
+)
+
+# --- 2) Per-story totals (if constant per story, mean() is fine) ---
+events_by_story <- course_filter_emotional %>%
+  group_by(story) %>%
+  summarise(total_num_events = mean(total_num_events, na.rm = TRUE), .groups = "drop")
+
+# --- 3) Simple slopes forest (unchanged) ---
+slopes <- emtrends(res99, ~ valence, var = "z_pupil")
+slopes_df <- as.data.frame(confint(slopes)) %>%
+  rename(slope = z_pupil.trend, lower = lower.CL, upper = upper.CL)
+
+p_forest <- ggplot(slopes_df, aes(x = slope, y = valence)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_pointrange(aes(xmin = lower, xmax = upper), size = 0.6) +
+  labs(x = "Slope of z_pupil on cosine_similarity", y = NULL) +
+  theme_minimal()
+
+# --- 4) Build FULL prediction grid: z_pupil × story × valence ---
+z_grid <- seq(-2, 2, length.out = 101)
+
+pred_data <- tidyr::expand_grid(
+  z_pupil = z_grid,
+  story   = levels(course_filter_emotional$story),
+  valence = levels(course_filter_emotional$valence)
+) %>%
+  left_join(events_by_story, by = "story") %>%
+  # subject is random; include a dummy level so factors are known (random effects are not added)
+  mutate(subject = levels(course_filter_emotional$subject)[1])
+
+# --- 5) Build reference grid FROM our pred_data, then average over story ---
+rg <- ref_grid(res99, data = pred_data)
+em_grid <- emmeans(rg, ~ valence | z_pupil)  # averages over story because story varies in pred_data
+
+pred_df <- as.data.frame(confint(em_grid)) %>%
+  rename(fit = emmean, lower = lower.CL, upper = upper.CL)
+
+# --- 6) Plot: fixed-effects lines that respect per-story total_num_events ---
+p_lines <- ggplot(pred_df, aes(x = z_pupil, y = fit, color = valence, fill = valence)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.15, color = NA) +
+  geom_line(size = 1) +
+  labs(x = "z_pupil", y = "Predicted cosine_similarity") +
+  theme_minimal()
+
+p_forest
+p_lines
+
+```
+
+```{r}
+library(emmeans)
+emtrends(res99, ~ valence, var = "z_pupil")      # slopes + CIs per valence
+pairs(emtrends(res99, ~ valence, var = "z_pupil")) # test of slope difference (interaction)
+```
+
+
+

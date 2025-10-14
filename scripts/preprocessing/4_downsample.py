@@ -1,7 +1,14 @@
-# Authors: Kruthi Gollapudi (kruthig@uchicago.edu), Jadyn Park (jadynpark@uchicago.edu), Kumiko Ueda (kumiko@uchicago.edu)
-# Last Edited: June 8, 2025
-# Description: The script applies lowpass of 4Hz and downsamples the clean (interpolated) pupil data to 50 Hz
-# Downsampled via averaging (i.e., taking the mean of every N samples)
+# Authors: Kruthi Gollapudi (kruthig@uchicago.edu), Jadyn Park (jadynpark@uchicago.edu), Kumiko Ueda (kumiko@uchicago.edu), Yolanda Pan (xpan02@uchicago.edu)
+# Last Edited: July 21, 2025
+# Description: This script applies a 4 Hz low-pass Butterworth filter and downsamples interpolated pupil data to 50 Hz.
+    # To avoid distortion from NaNs during filtering, we temporarily interpolate missing values,
+    # then reapply the original NaN mask after filtering.
+# Steps:
+# 1. Load interpolated pupil data (from earlier blink-aware + short-gap pipeline)
+# 2. Temporarily linearly interpolate all remaining NaNs (for filtering)
+# 3. Apply zero-phase low-pass Butterworth filter (filtfilt)
+# 4. Restore original NaN positions
+# 5. Resample (downsample) to 50 Hz by averaging every 20ms bin
 
 import os
 import numpy as np
@@ -9,10 +16,10 @@ import pandas as pd
 from scipy.signal import butter, filtfilt
 
 # ------------------ Hardcoded parameters ------------------ #
-os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
+os.chdir('/Users/UChicago/CASNL/storyfest/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
-EXP_TYPE = "recall" # "encoding" or "recall"
-SDSCORE = 2
+EXP_TYPE = "encoding" # "encoding" or "recall"
+SDSCORE = 3
 DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/3_interpolated/' + EXP_TYPE))
 SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/4_downsampled/' + EXP_TYPE))
 
@@ -36,7 +43,7 @@ SUBJ_IDS = range(1001,1046)
 def lowpass_filter(data, sample_rate, cutoff, order=3):
     nyquist = 0.5 * sample_rate
     normal_cutoff = cutoff / nyquist
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    b, a = butter(order, normal_cutoff, btype='lowpass', analog=False)
     filtered_data = filtfilt(b, a, data)
     return filtered_data
 
@@ -59,24 +66,32 @@ for run in runs:
             group_num = 3
 
         # Load clean pupil data
-        input_file = os.path.join(current_dat, f"{sub}_{group_num}_{SDSCORE}SD_interpolated_{EXP_TYPE}.csv")
+        input_file = os.path.join(current_dat, f"{sub}_{SDSCORE}SD_interpolated.csv")
         if not os.path.exists(input_file):
             print(f"No Input File for Subject {sub}")
             continue
         dat = pd.read_csv(input_file)
+        dat_pupil = dat['pupil_interp_all']
+
+        # Temporarily interpolate all NaNs for filtering
+        nan_mask = dat['pupil_interp_all'].isna()
+        interp_tmp = dat['pupil_interp_all'].interpolate(method='linear', limit_direction='both')
 
         # Apply 4 Hz lowpass filter
-        filtered_pupil = lowpass_filter(dat['pupilSize_clean'].values, SAMPLE_RATE_HZ, cutoff=4)
+        filtered_pupil = lowpass_filter(interp_tmp.values, SAMPLE_RATE_HZ, cutoff=4)
+
+        # Restore original NaN positions
+        filtered_pupil[nan_mask.values] = np.nan
 
         # Replace original signal with filtered one
-        dat['pupilSize_clean'] = filtered_pupil
+        dat['pupil_interp_all'] = filtered_pupil
         
         # Convert time to datetime and set as index
-        dat['time_in_ms_corrected'] = pd.to_datetime(dat['time_in_ms_corrected'], unit='ms')
-        dat.set_index('time_in_ms_corrected', inplace=True)
+        dat['time_corrected'] = pd.to_datetime(dat['time_corrected'], unit='ms')
+        dat.set_index('time_corrected', inplace=True)
         
         # Resample to 50 Hz (20 ms intervals) and aggregate (e.g., take mean of each chunk)
-        pupilSize_downsampled = dat['pupilSize_clean'].resample(f"{DOWNSAMPLE_RATE_MS}ms").mean()
+        pupilSize_downsampled = dat['pupil_interp_all'].resample(f"{DOWNSAMPLE_RATE_MS}ms").mean()
         pupilSize_downsampled.reset_index(drop=True, inplace=True)
         
         # Create a new time column
@@ -89,5 +104,5 @@ for run in runs:
         print("Subject", sub, "; num samples: ", len(time_in_ms_downsampled))
         
         # Save downsampled data
-        output_file = os.path.join(current_save, f"{sub}_{group_num}_{SDSCORE}SD_downsampled_{EXP_TYPE}.csv")
+        output_file = os.path.join(current_save, f"{sub}_{SDSCORE}SD_downsampled.csv")
         df_downsampled.to_csv(output_file, index=False)

@@ -13,9 +13,10 @@ from collections import defaultdict
 # ------------------ Hardcoded parameters ------------------ #
 os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
 EXP_TYPE = "encoding"
+SDSCORE = 3
 _THISDIR = os.getcwd()
-DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/6_eventlocked', EXP_TYPE))
-SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/7_isc_event', EXP_TYPE))
+DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/6_eventlocked', EXP_TYPE, str(SDSCORE) + "SD"))
+SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/7_isc_event', EXP_TYPE, str(SDSCORE) + "SD"))
 os.makedirs(SAVE_PATH, exist_ok=True)
 
 FILTER_TYPE = "lowpass"  # "lowpass" or "bandpass"
@@ -98,7 +99,7 @@ for sub in SUBJ_IDS:
     group_num = (sub - 1000) % 3 or 3
     for run in ['run_1', 'run_2']:
         file_path = os.path.join(DAT_PATH, run, f"{sub}_{group_num}_{run}_{FILTER_TYPE}_event_aligned.csv")
-        pupil_file = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/5_timelocked/{EXP_TYPE}/{run}/{sub}_{group_num}_{run}_{FILTER_TYPE}_2SD_downsample_to_sec_{EXP_TYPE}.csv'))
+        pupil_file = os.path.normpath(os.path.join(_THISDIR, f'../../data/pupil/3_processed/5_timelocked/{EXP_TYPE}/{SDSCORE}SD/{run}/{sub}_{group_num}_{run}_{FILTER_TYPE}_{SDSCORE}SD_downsample_to_sec_{EXP_TYPE}.csv'))
         if not os.path.exists(file_path):
             print(f"Missing pupil file for subject {sub}, run {run}")
             continue

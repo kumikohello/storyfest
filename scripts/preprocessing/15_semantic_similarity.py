@@ -12,11 +12,12 @@ import seaborn as sns
 from functools import reduce
 
 # ------------------ Hardcoded parameters ------------------ #
-os.chdir('/Users/UChicago/CASNL/storyfest/scripts/preprocessing')
+os.chdir('/Users/UChicago/CASNL/storyfest/storyfest/scripts/preprocessing')
 _THISDIR = os.getcwd()
 DAT_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/recall_transcripts/event_segmented_recall'))
 SAVE_PATH = os.path.normpath(os.path.join(_THISDIR, '../../data/pupil/3_processed/15_semantic_similarity'))
 EVENTS_PATH = os.path.normpath(os.path.join(_THISDIR, '../../experiment/Storyfest_Event_Segmentation.xlsx'))
+# COURSE_EVENTS_PATH = os.path.normpath(os.path.join(_THISDIR, '../../experiment/eventsegmentation_coarse.xlsx'))
 
 if not os.path.exists(SAVE_PATH):
     os.makedirs(SAVE_PATH)
@@ -45,6 +46,15 @@ EVENT_COUNT = {
     'Dont Look': 41
 }
 
+# COURSE_EVENT_COUNT = {
+#     'Pool Party': 7,
+#     'Sea Ice': 8,
+#     'Natalie Wood': 17,
+#     'Grandfather Clocks': 11,
+#     'Impatient Billionaire': 7,
+#     'Dont Look': 13
+# }
+
 # Download model to local
 module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
 model = hub.load(module_url)
@@ -53,6 +63,9 @@ print ("module %s loaded" % module_url)
 
 # ------------------ Define functions ------------------ # 
 def embed(input):
+    if not input or all(not str(t).strip() for t in input):
+        print("⚠️ Skipping embedding: No valid text found.")
+        return None
     return model(input)
 
 def cosine_similarity(vector1, vector2):
@@ -109,6 +122,9 @@ for subid in SUBJ_IDS:
         recall_transcript_nan_indices = pd.isnull(sheet['Subj_Transcript'])
         recall_transcript_no_nans = [x for x in recall_transcript if str(x) != 'nan']
         recall_embeddings = embed(recall_transcript_no_nans)
+        if recall_embeddings is None:
+            print("recall_embeddings is None")
+            continue  # or handle differently
 
         # Add the nans back to their original position
         recall_embeddings_with_nans = np.full((len(recall_transcript), recall_embeddings.shape[1]), np.nan)

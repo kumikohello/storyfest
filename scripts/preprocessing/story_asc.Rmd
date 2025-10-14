@@ -1,0 +1,282 @@
+---
+title: "story_asc"
+output: html_document
+date: "2025-09-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(ggeffects)
+library(glue)
+library(tibble)
+```
+
+```{r}
+# Load df
+story_data <- read.csv("/Users/UChicago/CASNL/storyfest/storyfest/data/pupil/3_processed/8_stack_df/story/stacked_events_0.1.csv")
+```
+
+```{r}
+story_data$story<-as.factor(story_data$story)
+story_data$valence<-as.factor(story_data$valence)
+story_data$subject<-as.factor(story_data$subject)
+story_data$valence <- relevel(story_data$valence, ref="neutral")
+```
+
+```{r}
+story_order <- c("Dont Look", "Natalie Wood", "Sea Ice",
+                 "Grandfather Clocks", "Impatient Billionaire", "Pool Party")
+
+if (is.na("subject")) {
+  stop("Couldn't find a subject column. Add one of: subject, subj, subject_id, participant, id, SID, Subject")
+}
+
+# 1) One value per (subject, story) by averaging events
+subject_story <- story_data %>%
+  group_by(.data[["subject"]], story) %>%
+  summarise(z_pupil_story_mean = mean(z_pupil, na.rm = TRUE), .groups = "drop")
+
+# 2) Story-level summary across subjects (mean ± SE)
+summary_story <- subject_story %>%
+  group_by(story) %>%
+  summarise(
+    n      = dplyr::n(),  # number of subjects contributing to this story
+    mean_z = mean(z_pupil_story_mean, na.rm = TRUE),
+    sd_z   = sd(z_pupil_story_mean,   na.rm = TRUE),
+    se_z   = ifelse(n > 1, sd_z / sqrt(n), 0),  # 0-length whisker if only 1 subject
+    .groups = "drop"
+  )
+
+# Valence mapping
+if ("valence_label" %in% names(story_data)) {
+  story_valence <- story_data %>%
+    distinct(story, valence_label) %>%
+    group_by(story) %>% slice_head(n = 1) %>% ungroup()
+} else {
+  story_valence <- tibble(
+    story = story_order,
+    valence_label = c("negative", "negative", "neutral",
+                      "neutral", "positive", "positive")
+  )
+}
+
+plot_df <- summary_story %>%
+  left_join(story_valence, by = "story") %>%
+  mutate(
+    story = factor(story, levels = story_order),
+    valence_label = factor(valence_label, levels = c("negative","neutral","positive"))
+  )
+
+# 3) Plot bars + SE error bars
+ggplot(plot_df, aes(x = story, y = mean_z, fill = valence_label)) +
+  geom_col(width = 0.7, color = "black") +   # black outline on bars
+  geom_errorbar(
+    aes(ymin = mean_z - se_z, ymax = mean_z + se_z),
+    width = 0.15, linewidth = 0.6
+  ) +
+  scale_x_discrete(limits = story_order) +
+  scale_fill_manual(values = c(negative = "#4575b4",  # softer blue
+                               neutral  = "#bdbdbd",  # light gray
+                               positive = "#d73027")) + # softer red
+  labs(
+    title = "Average Z-Scored Pupil by Story",
+    x = NULL, y = NULL, fill = "Valence"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.major = element_blank(),   # remove major grid
+    panel.grid.minor = element_blank(),   # remove minor grid
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    axis.line = element_line(color = "black"),
+    panel.border = element_blank(),
+    legend.position = "right",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+```
+
+```{r}
+posterior_mean_draws <- function(x, n_draws = 8000,
+                                 mu0 = 0, kappa0 = 1e-6,
+                                 alpha0 = 0.001, beta0 = 0.001) {
+  x <- x[is.finite(x)]
+  n <- length(x)
+  if (n < 1) stop("Not enough data in group to form a posterior.")
+
+  xbar <- mean(x)
+  ss   <- sum((x - xbar)^2)
+
+  kappa_n <- kappa0 + n
+  mu_n    <- (kappa0 * mu0 + n * xbar) / kappa_n
+  alpha_n <- alpha0 + n / 2
+  beta_n  <- beta0 + 0.5 * ss + (kappa0 * n * (xbar - mu0)^2) / (2 * kappa_n)
+
+  df    <- 2 * alpha_n
+  scale <- sqrt(beta_n / (alpha_n * kappa_n))
+
+  mu_n + scale * rt(n_draws, df = df)
+}
+
+# If valence_label missing, map from story names (edit mapping if needed)
+story_order <- c("Dont Look", "Natalie Wood", "Sea Ice",
+                 "Grandfather Clocks", "Impatient Billionaire", "Pool Party")
+
+if (!("valence_label" %in% names(story_data))) {
+  story_valence <- tibble(
+    story = story_order,
+    valence_label = c("negative", "negative", "neutral",
+                      "neutral", "positive", "positive")
+  )
+  story_data <- story_data %>% left_join(story_valence, by = "story")
+}
+
+# Keep only positive/negative
+dat <- story_data %>%
+  filter(valence_label %in% c("positive", "negative")) %>%
+  select(valence_label, z_pupil) %>%
+  filter(is.finite(z_pupil))
+
+# Posterior draws for each group mean
+draws_pos <- posterior_mean_draws(dat$z_pupil[dat$valence_label == "positive"])
+draws_neg <- posterior_mean_draws(dat$z_pupil[dat$valence_label == "negative"])
+
+# --------------------------------------------
+# Pretty “boxed” posterior plot (like your example)
+#   - histogram (density-scaled) in light blue
+#   - dashed vline at 0
+#   - bold 95% CI bar on baseline with endpoint labels
+#   - annotation: mean and P(posterior > 0)
+# --------------------------------------------
+plot_posterior_boxed <- function(draws, title_text = NULL,
+                                 hist_fill = "#9bd3e6") {
+  # summaries
+  m   <- mean(draws)
+  pgt <- mean(draws > 0)
+  ci  <- quantile(draws, c(0.025, 0.975))
+  dens <- density(draws)
+  ymax <- max(dens$y)
+
+  # format labels
+  mean_lab <- sprintf("Mean=%.3f", m)
+  prob_lab <- sprintf("P(posterior > 0)=%.3f", pgt)
+
+  df <- tibble(mu = draws)
+
+  ggplot(df, aes(x = mu)) +
+    # histogram scaled to density so baseline y=0 works nicely
+    geom_histogram(aes(y = after_stat(density)),
+                   bins = 40, fill = hist_fill, alpha = 0.8, color = NA) +
+    # dashed line at zero
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.7) +
+    # thick CI bar on the baseline with endpoint labels
+    geom_segment(aes(x = ci[1], xend = ci[2], y = 0, yend = 0),
+                 inherit.aes = FALSE, linewidth = 3.0, lineend = "butt", color = "black") +
+    annotate("text", x = ci[1], y = 0, label = sprintf("%.3f", ci[1]),
+             vjust = -1.1, size = 4) +
+    annotate("text", x = ci[2], y = 0, label = sprintf("%.3f", ci[2]),
+             vjust = -1.1, size = 4) +
+    # mean & probability annotations near top of the histogram
+    annotate("text", x = m, y = 0.85 * ymax, label = mean_lab,
+             size = 5, fontface = "bold") +
+    annotate("text", x = m, y = 0.72 * ymax, label = prob_lab,
+             size = 4.5) +
+    labs(
+      x = "Posterior distribution",
+      y = NULL,
+      title = title_text
+    ) +
+    coord_cartesian(ylim = c(0, ymax * 1.05)) +
+    theme_classic(base_size = 14) +
+    theme(
+      # simple look like your example
+      panel.border = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      # light background similar to a cream paper (optional)
+      # panel.background = element_rect(fill = "#faf6f2", color = NA)
+    )
+}
+
+# --------------------------------------------
+# Build the two separate figures
+# --------------------------------------------
+# --- Build separate plots with your colors ---
+# Assuming you already have draws_pos and draws_neg from previous step:
+# draws_pos <- posterior_mean_draws(dat$z_pupil[dat$valence_label == "positive"])
+# draws_neg <- posterior_mean_draws(dat$z_pupil[dat$valence_label == "negative"])
+
+p_pos <- plot_posterior_boxed(
+  draws_pos,
+  title_text = "Valence: Positive",
+  hist_fill  = "#EFA3A3"
+)
+
+p_neg <- plot_posterior_boxed(
+  draws_neg,
+  title_text = "Valence: Negative",
+  hist_fill  = "#9BC7E3"
+)
+
+print(p_pos)
+print(p_neg)
+
+# Optional: save each figure
+# ggsave("posterior_positive.png", p_pos, width = 5.5, height = 3.5, dpi = 300)
+# ggsave("posterior_negative.png", p_neg, width = 5.5, height = 3.5, dpi = 300)
+```
+
+```{r}
+# ---- Compute per-(subject, story) averages ----
+story_means <- story_data %>%
+  group_by(subject, story) %>%
+  summarise(avg_pupil = mean(.data[["z_pupil"]], na.rm = TRUE), .groups = "drop")
+
+library(tidyr)
+# Enforce complete 6x per subject: fill missing combos (if any) with NA and then drop with a warning
+story_means <- story_means %>%
+  tidyr::complete(subject, story = story_order) %>%
+  arrange(subject, factor(story, levels = story_order))
+
+# Warn if any subject-story cell was missing raw data
+n_missing_cells <- sum(is.na(story_means$avg_pupil))
+if (n_missing_cells > 0) {
+  warning(glue("Detected {n_missing_cells} missing (subject, story) cells. These rows will be dropped for the model."))
+}
+
+# Keep only complete rows for modeling
+story_means_model <- story_means %>% drop_na(avg_pupil)
+
+library(dplyr)
+library(tidyr)
+label_by_story <- story_data %>%
+  dplyr::distinct(story, valence)
+
+story_means_model <- story_means_model %>%
+  dplyr::left_join(label_by_story, by = "story") %>%
+  dplyr::mutate(
+    valence = factor(valence, levels = c("negative","neutral","positive"))
+  )
+
+total_num_events <- data.frame(
+  story = c("Pool Party", "Impatient Billionaire", "Sea Ice", "Grandfather Clocks", "Natalie Wood", "Dont Look"),
+  total_num_events = c(7, 7, 8, 11, 17, 13)
+)
+story_means_model <- merge(story_means_model, total_num_events, by = "story", all.x = TRUE)
+
+story_means_model$story<-as.factor(story_means_model$story)
+story_means_model$valence<-as.factor(story_means_model$valence)
+story_means_model$subject<-as.factor(story_means_model$subject)
+story_means_model$valence <- relevel(story_means_model$valence, ref="neutral")
+
+story_m1 <- lmer(avg_pupil ~ valence + (1 | subject) + (1|story) + total_num_events, data = story_means_model)
+summary(story_m1)
+
+story_m1_2 <- lmer(avg_pupil ~ valence + (1 | subject) + (1|story), data = story_means_model)
+summary(story_m1_2)
+```
+
